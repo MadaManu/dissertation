@@ -1,0 +1,6 @@
+.codelite/
+Debug/
+*.project
+*.workspace
+*.batch_build
+masters_dissertation.txt
