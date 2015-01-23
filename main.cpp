@@ -4,6 +4,8 @@
 #include <cstdlib> 
 #include <string>
 #include <x86intrin.h>
+#include <stdio.h>
+#include <bitset>
 
 
 using namespace std;
@@ -12,6 +14,26 @@ const int size = 1024 * 1024;
 
 typedef unsigned long long u64;
 typedef unsigned short u16;
+
+
+template<typename T>
+void show_binrep(const T& a)
+{
+    const char* beg = reinterpret_cast<const char*>(&a);
+    const char* end = beg + sizeof(a);
+	std::cout<<" => ";
+    while(beg != end)
+        std::cout << std::bitset<CHAR_BIT>(*beg++) << ' ';
+    std::cout << '\n';
+}
+
+
+
+union conversion_union {
+  long long l;
+  double d;
+  float f;
+} convert;
 
 /************** class u48 **********************************/
 class u48 {
@@ -46,32 +68,91 @@ union un {
 f48::f48(double value)
 {
   // convert to 64-bit pattern
-  u64 tmp = _castf64_u64;
+//   u64 tmp = _castf64_u64(value);// not valid INTEL operation
+  convert.d = value;
+  long long tmp = 0;
+//  convert.l = 5558888888888888888;
+	cout<<value;
+	cout<<"\n";
+  cout<<convert.d;
+  show_binrep(convert.d);
   // round to nearest even is a little complex
   // the u64 number has the following format:
   // 47upper_bits:L:G:15lower_bits
-  // we need to round so that L is the last bit of the rounded number
-
-  // S has the value 1 if any of the 15 lower bits is 1
-  // this happens if we add 111111111111111 to the lower
-  // bits, and we get an overflow into bit 16
-  u64 lower_bits = tmp & ((1 << 16)-1);
-  u64 S = (lower_bits >> 15) & 1;
-  u64 G = (tmp >> 15) & 1;
-  u64 L = (tmp >> 16) & 1;
-  round_bit = G & (L | S);
-
-  // very simple rounding
-  tmp = temp + ((1 << 15)-1);
-  // round to nearest even not implemented yet
-
-  // compensate for little-endianness
-  this->num = tmp >> 16;
+  tmp = convert.l;
+  bool S = (tmp & 65535)>0 ? 1:0; // STICKY bit - OR of the remaining bits
+  bool R = (tmp >> 15) & 1;  // ROUND bit - first bit removed
+  bool G = (tmp >> 16) & 1;  // GUARD bit - LSB of result
+  
+  u64 mantissa = (tmp&4503599627370495)>>16; // extracts the remainding mantissa from number
+  long long signExponent = (tmp>>52)<<52; // clear the mantissa
+/*
+ * Rounding to the nearest even
+ * 
+ * G = 0 - do nothing just truncate
+ * G = 1 - check R&S as below
+ * 
+ * R  S
+ * 0  0 - TIE (check bit before G: if 1 up else nothing
+ * 0  1 - up
+ * 1  0 - up
+ * 1  1 - up
+ */
+cout<<G;
+show_binrep(G);
+  if(G){
+	  cout<<(R|S);
+	  cout<<"::::";
+	  cout<<R||S;
+	  if (R||S){ // R or S is true go up
+		cout<<"DOING THIS MANTISA MANIPULATION AS R OR S IS 1";
+		  mantissa = mantissa +1;
+		  if((mantissa>>36)&1){ // overflow of mantissa
+			  mantissa = 0; // reset mantissa
+			  // add one to exponent
+			  // TODO: extract exponent only add one to it and check for overflow
+			  // if overflow happens on exponent set number to positive/negative infinity
+			  signExponent = signExponent + 1;
+		  }
+	  } else { // TIE situation
+	  // add 1 if the mantissa is odd
+	  // add 1 if the mantissa is even
+		  // check bit before G
+		  if((mantissa>>1)&1) {
+			  mantissa = mantissa +1;
+			  if((mantissa>>36)&1){ // overflow of mantissa
+				  mantissa = 0; // reset mantissa
+				  // add one to exponent
+				  // TODO: extract exponent only add one to it and check for overflow
+				  // if overflow happens on exponent set number to positive/negative infinity
+				  signExponent = signExponent + 1;
+			  }
+		  } // else do nothing 
+	  }
+  } else {
+	  // not required as if G is 0 R&S are x (don't cares)
+  }
+  long long result = (mantissa<<16) + signExponent;
+  show_binrep(mantissa<<16);
+  show_binrep(signExponent);
+  show_binrep(result);
+  
+/* ------ Testing purposes ------ */  
+  cout<<"S="<<S;
+  cout<<"R="<<R;
+  cout<<"G="<<G;
+/* ------------------------------ */
+cout<<(double)result;
+	// compensate for little endianess
+  this->num = result >> 16;
+  
 }
 
 f48::operator double()
 {
-  return _castu64_f64((this->num) << 16); 
+  // convert to double
+  convert.l = (this->num)<<16;
+  return convert.d; 
 }
 
 #else
@@ -115,7 +196,7 @@ f48::operator double()
 
 template <class T>
 void populate_array(T * a)
-{
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {
   //srand((unsigned)time(0)); 
   srand(5);
 
@@ -322,21 +403,25 @@ void test_double_vec()
   }
 }
 
+
+
 int main()
 {
-  u48 dummy48u;
-  u64 dummy64u;
-  f48 dummy48f;
-  double dummy64d;
+//  u48 dummy48u;
+//  u64 dummy64u;
 
-  test_type(dummy48u, "u48     ");
-  test_type(dummy64u, "u64     ");
-  test_u48_vec();
-  test_type(dummy64d, "f64     ");
-  test_type(dummy48f, "f48     ");
-  test_f48_vec();
-  test_double_vec();
-int test;
-cin>>test;
+//  double dummy64d;
+//
+//  test_type(dummy48u, "u48     ");
+//  test_type(dummy64u, "u64     ");
+//  test_u48_vec();
+//  test_type(dummy64d, "f64     ");
+// test_type(dummy48f, "f48     ");
+//  test_f48_vec();
+//  test_double_vec();
+double a;
+cin>>a;
+f48 dummy48f (a);
+cin>>a;
   return 0;
 }
