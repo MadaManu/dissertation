@@ -142,11 +142,18 @@ show_binrep(G);
   cout<<"R="<<R;
   cout<<"G="<<G;
 /* ------------------------------ */
-cout<<(double)result;
+
+// to convert the number back to double there is a need of having the conversion 
+// done in the union (convert)
+
+convert.l = result;
+cout<<convert.d;
 	// compensate for little endianess
   this->num = result >> 16;
   
 }
+
+// TODO: implementation of BLAS
 
 f48::operator double()
 {
