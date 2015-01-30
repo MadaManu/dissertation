@@ -4,7 +4,6 @@
 #include <cstdlib> 
 #include <string>
 #include <x86intrin.h>
-#include <emmintrin.h>
 #include <stdio.h>
 #include <bitset>
 
@@ -162,7 +161,7 @@ f48::f48(double value)
 {
   union un temp;
   u64 round;
-
+	
   // convert to 64-bit pattern
   temp.f = value;
 
@@ -405,33 +404,33 @@ void test_double_vec()
   }
 }
 
-double * dot_product_SSE_f48 (f48 *a, f48 *b){
-	
+f48 dot_product_SSE_f48 (f48 *a, f48 *b){
+	f48 total_result;
 	double total=0;
-	double * res = new double[2];
-	__m128d result_vec = _mm_set1_pd(0.0); // questionable if need to compute result in a vec
+	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
 	__m128d temp_vect;
 	// the masking is different for f48 compared to u48.
 	// with f48 we want to insert zeroes for the two lower bytes
-	__m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+	__m128i mask = _mm_set_epi8(13, 12, 11, 10, 9, 8, 255, 255,
 					5, 4, 3, 2, 1, 0, 255, 255);
     
-	for ( int i = 0; i < 2; i+= 2 ) {
+	// CHANGE SIZE TO SIZE OF ARRAY FROM POPULATION
+	for ( int i = 0; i < 4; i+= 2 ) {
 		// load vectors
 		__m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
 		a_vec = _mm_shuffle_epi8(a_vec, mask);
 		__m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
 		b_vec = _mm_shuffle_epi8(b_vec, mask);
 		// a & b vectors loaded
-		
 		// compute multiplication and save temporary = a[1]*b[1]   a[0]*b[0]
 		 temp_vect = _mm_mul_pd((__m128d)a_vec, (__m128d)b_vec);
-		 _mm_storeu_pd(res, (__m128d)b_vec);
-		 //result_vec = _mm_add_pd(temp_vect, temp_vect);  //performs vertical addition
+		 temp_vect = _mm_hadd_pd(temp_vect, temp_vect);  //performs vertical addition
+		 result_vec = _mm_add_pd(result_vec, temp_vect); // cumulate result
 	}
-	//result_vec= _mm_hadd_pd(result_vec, result_vec); // cumulate result
-	//_mm_storeu_pd(&total, result_vec);
-	return res;
+	// store result into double
+	_mm_storeu_pd(&total, result_vec);
+	total_result = f48(total);
+	return total_result;
 }
 
 int main()
@@ -461,15 +460,20 @@ int main()
 //f48 dummy48f (a);
 //cin>>a;
 int x;
-f48 * a = new f48[2];
-a[0] = f48(5);
-a[1] = f48(7);
-f48 * b = new f48[2];
-b[0] = f48(8);
-b[1] = f48(144);
-double* result;
+f48 * a = new f48[4];
+a[0] = f48(3.1);
+a[1] = f48(1.2);
+a[2] = f48(5.5);
+a[3] = f48(1.3);
+f48 * b = new f48[4];
+b[0] = f48(1.2);
+b[1] = f48(2);
+b[2] = f48(3);
+b[3] = f48(1.5);
+f48 result;
 result = dot_product_SSE_f48(a,b);
-cout<<"\n RESULT: "<<result[0]<<","<<result[1];
+convert.l = (unsigned long long)result;
+cout<<"\n RESULT: "<<convert.d;
 cin>>x;
   return 0;
 }
