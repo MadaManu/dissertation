@@ -5,15 +5,15 @@
 ## Debug
 ProjectName            :=masters_dissertation
 ConfigurationName      :=Debug
-WorkspacePath          := "C:\Users\Madalin\Masters\Dissertation\masters_dissertation"
-ProjectPath            := "C:\Users\Madalin\Masters\Dissertation\masters_dissertation"
+WorkspacePath          := "C:\Users\Madalin\Masters\Dissertation\source_code"
+ProjectPath            := "C:\Users\Madalin\Masters\Dissertation\source_code"
 IntermediateDirectory  :=./Debug
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=Madalin
-Date                   :=10/28/14
+Date                   :=01/30/15
 CodeLitePath           :="C:\Program Files (x86)\CodeLite"
 LinkerName             :=C:/MinGW-4.8.1/bin/g++.exe 
 SharedObjectLinkerName :=C:/MinGW-4.8.1/bin/g++.exe -shared -fPIC
@@ -52,7 +52,7 @@ LibPath                := $(LibraryPathSwitch).
 AR       := C:/MinGW-4.8.1/bin/ar.exe rcu
 CXX      := C:/MinGW-4.8.1/bin/g++.exe 
 CC       := C:/MinGW-4.8.1/bin/gcc.exe 
-CXXFLAGS :=  -g -O0 -Wall -msse2 -msse4.1 -mpclmul $(Preprocessors)
+CXXFLAGS :=  -g -O0 -Wall -msse2 -msse4.1 -mpclmul -mavx -march=corei7-avx -pipe $(Preprocessors)
 CFLAGS   :=  -g -O0 -Wall $(Preprocessors)
 ASFLAGS  := 
 AS       := C:/MinGW-4.8.1/bin/as.exe 
@@ -91,7 +91,7 @@ PreBuild:
 ## Objects
 ##
 $(IntermediateDirectory)/main.cpp$(ObjectSuffix): main.cpp $(IntermediateDirectory)/main.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "C:/Users/Madalin/Masters/Dissertation/masters_dissertation/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "C:/Users/Madalin/Masters/Dissertation/source_code/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/main.cpp$(DependSuffix): main.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/main.cpp$(DependSuffix) -MM "main.cpp"
 

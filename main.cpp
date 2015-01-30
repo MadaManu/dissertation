@@ -4,6 +4,7 @@
 #include <cstdlib> 
 #include <string>
 #include <x86intrin.h>
+#include <emmintrin.h>
 #include <stdio.h>
 #include <bitset>
 
@@ -30,7 +31,7 @@ void show_binrep(const T& a)
 
 
 union conversion_union {
-  long long l;
+  unsigned long long l;
   double d;
   float f;
 } convert;
@@ -70,22 +71,16 @@ f48::f48(double value)
   // convert to 64-bit pattern
 //   u64 tmp = _castf64_u64(value);// not valid INTEL operation
   convert.d = value;
-  long long tmp = 0;
-//  convert.l = 5558888888888888888;
-	cout<<value;
-	cout<<"\n";
-  cout<<convert.d;
-  show_binrep(convert.d);
+  unsigned long long tmp = convert.l;
   // round to nearest even is a little complex
   // the u64 number has the following format:
   // 47upper_bits:L:G:15lower_bits
-  tmp = convert.l;
+  
   bool S = (tmp & 65535)>0 ? 1:0; // STICKY bit - OR of the remaining bits
   bool R = (tmp >> 15) & 1;  // ROUND bit - first bit removed
   bool G = (tmp >> 16) & 1;  // GUARD bit - LSB of result
-  
   u64 mantissa = (tmp&4503599627370495)>>16; // extracts the remainding mantissa from number
-  long long signExponent = (tmp>>52)<<52; // clear the mantissa
+  unsigned long long signExponent = (tmp>>52)<<52; // clear the mantissa
 /*
  * Rounding to the nearest even
  * 
@@ -98,21 +93,23 @@ f48::f48(double value)
  * 1  0 - up
  * 1  1 - up
  */
-cout<<G;
-show_binrep(G);
+ 
   if(G){
-	  cout<<(R|S);
-	  cout<<"::::";
-	  cout<<R||S;
 	  if (R||S){ // R or S is true go up
-		cout<<"DOING THIS MANTISA MANIPULATION AS R OR S IS 1";
 		  mantissa = mantissa +1;
 		  if((mantissa>>36)&1){ // overflow of mantissa
 			  mantissa = 0; // reset mantissa
 			  // add one to exponent
-			  // TODO: extract exponent only add one to it and check for overflow
-			  // if overflow happens on exponent set number to positive/negative infinity
-			  signExponent = signExponent + 1;
+			  // extract exponent only add one to it and check for overflow
+			  unsigned long long exponent_mask = (unsigned long long)(1)<<63;
+			  exponent_mask = ~exponent_mask;
+			  unsigned long long exponent = (signExponent & exponent_mask);
+			  exponent += 1;
+			  exponent = exponent >> 12;
+			  if (exponent>0) { // overflow on exponent set to +/- infinity
+				  signExponent = signExponent | ((unsigned long long)2047<<52); // set all the bits of the exponent to 1 keeping sign
+				  mantissa = mantissa & 0; // make sure mantissa is 0
+			  }
 		  }
 	  } else { // TIE situation
 	  // add 1 if the mantissa is odd
@@ -123,35 +120,33 @@ show_binrep(G);
 			  if((mantissa>>36)&1){ // overflow of mantissa
 				  mantissa = 0; // reset mantissa
 				  // add one to exponent
-				  // TODO: extract exponent only add one to it and check for overflow
-				  // if overflow happens on exponent set number to positive/negative infinity
-				  signExponent = signExponent + 1;
+				  // extract exponent only add one to it and check for overflow
+				   unsigned long long exponent_mask = (unsigned long long)(1)<<63;
+				  exponent_mask = ~exponent_mask;
+				  unsigned long long exponent = (signExponent & exponent_mask);
+				  exponent += 1;
+				  exponent = exponent >> 12;
+				  if (exponent>0) { // overflow on exponent set to +/- infinity
+					  signExponent = signExponent | ((unsigned long long)2047<<52); // set all the bits of the exponent to 1 keeping sign
+					  mantissa = mantissa & 0; // make sure mantissa is 0
+				  }
 			  }
 		  } // else do nothing 
 	  }
   } else {
 	  // not required as if G is 0 R&S are x (don't cares)
   }
-  long long result = (mantissa<<16) + signExponent;
-  show_binrep(mantissa<<16);
-  show_binrep(signExponent);
-  show_binrep(result);
-  
-/* ------ Testing purposes ------ */  
-  cout<<"S="<<S;
-  cout<<"R="<<R;
-  cout<<"G="<<G;
-/* ------------------------------ */
-
+  unsigned long long result = (mantissa<<16) + signExponent;
 // to convert the number back to double there is a need of having the conversion 
 // done in the union (convert)
-
 convert.l = result;
-cout<<convert.d;
+//cout<<convert.d;
 	// compensate for little endianess
   this->num = result >> 16;
   
 }
+
+
 
 // TODO: implementation of BLAS
 
@@ -410,10 +405,45 @@ void test_double_vec()
   }
 }
 
-
+double * dot_product_SSE_f48 (f48 *a, f48 *b){
+	
+	double total=0;
+	double * res = new double[2];
+	__m128d result_vec = _mm_set1_pd(0.0); // questionable if need to compute result in a vec
+	__m128d temp_vect;
+	// the masking is different for f48 compared to u48.
+	// with f48 we want to insert zeroes for the two lower bytes
+	__m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+					5, 4, 3, 2, 1, 0, 255, 255);
+    
+	for ( int i = 0; i < 2; i+= 2 ) {
+		// load vectors
+		__m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
+		a_vec = _mm_shuffle_epi8(a_vec, mask);
+		__m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
+		b_vec = _mm_shuffle_epi8(b_vec, mask);
+		// a & b vectors loaded
+		
+		// compute multiplication and save temporary = a[1]*b[1]   a[0]*b[0]
+		 temp_vect = _mm_mul_pd((__m128d)a_vec, (__m128d)b_vec);
+		 _mm_storeu_pd(res, (__m128d)b_vec);
+		 //result_vec = _mm_add_pd(temp_vect, temp_vect);  //performs vertical addition
+	}
+	//result_vec= _mm_hadd_pd(result_vec, result_vec); // cumulate result
+	//_mm_storeu_pd(&total, result_vec);
+	return res;
+}
 
 int main()
 {
+
+// DEFINE SSE function to generate the dot product of 2 f48 SSE vectors	
+// load vectors with mask in __m128d
+// align data correctly
+// do the dot product (multiplication, addition, final horizontal addition after loop)
+// convert back to f48 and return result
+
+
 //  u48 dummy48u;
 //  u64 dummy64u;
 
@@ -426,9 +456,20 @@ int main()
 // test_type(dummy48f, "f48     ");
 //  test_f48_vec();
 //  test_double_vec();
-double a;
-cin>>a;
-f48 dummy48f (a);
-cin>>a;
+//double a;
+//cin>>a;
+//f48 dummy48f (a);
+//cin>>a;
+int x;
+f48 * a = new f48[2];
+a[0] = f48(5);
+a[1] = f48(7);
+f48 * b = new f48[2];
+b[0] = f48(8);
+b[1] = f48(144);
+double* result;
+result = dot_product_SSE_f48(a,b);
+cout<<"\n RESULT: "<<result[0]<<","<<result[1];
+cin>>x;
   return 0;
 }
