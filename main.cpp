@@ -56,7 +56,7 @@ public:
   f48() { };
   f48(double value);
   operator double();
-} __attribute__((packed));
+} __attribute__((__aligned__(8)));
 
 union un {
   double f;
@@ -405,7 +405,7 @@ void test_double_vec()
 }
 
 f48 dot_product_SSE_f48 (f48 *a, f48 *b){
-	f48 total_result;
+	
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
 	__m128d temp_vect;
@@ -429,7 +429,7 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	}
 	// store result into double
 	_mm_storeu_pd(&total, result_vec);
-	total_result = f48(total);
+	f48 total_result (total);
 	return total_result;
 }
 
@@ -466,7 +466,7 @@ a[1] = f48(1.2);
 a[2] = f48(5.5);
 a[3] = f48(1.3);
 f48 * b = new f48[4];
-b[0] = f48(1.2);
+b[0] = f48(1);
 b[1] = f48(2);
 b[2] = f48(3);
 b[3] = f48(1.5);
