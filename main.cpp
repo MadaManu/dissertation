@@ -16,16 +16,16 @@ typedef unsigned long long u64;
 typedef unsigned short u16;
 
 
-template<typename T>
-void show_binrep(const T& a)
-{
-    const char* beg = reinterpret_cast<const char*>(&a);
-    const char* end = beg + sizeof(a);
-	std::cout<<" => ";
-    while(beg != end)
-        std::cout << std::bitset<CHAR_BIT>(*beg++) << ' ';
-    std::cout << '\n';
-}
+//template<typename T>
+//void show_binrep(const T& a)
+//{
+//    const char* beg = reinterpret_cast<const char*>(&a);
+//    const char* end = beg + sizeof(a);
+//	std::cout<<" => ";
+//    while(beg != end)
+//        std::cout << std::bitset<CHAR_BIT>(*beg++) << ' ';
+//    std::cout << '\n';
+//}
 
 
 
@@ -47,16 +47,15 @@ public:
 } __attribute__((packed));
 
 /************* class f48 ************************************/
-
+#pragma packed
 class f48 {
 private:
-  unsigned long long num:48;
-  
+  unsigned long long num:48;  
 public:
   f48() { };
   f48(double value);
   operator double();
-} __attribute__((__aligned__(8)));
+} __attribute__((packed));
 
 union un {
   double f;
@@ -152,7 +151,7 @@ convert.l = result;
 f48::operator double()
 {
   // convert to double
-  convert.l = (this->num)<<16;
+  convert.l = (this->num)<<16; // pad to compensate for little endianess
   return convert.d; 
 }
 
@@ -411,11 +410,11 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	__m128d temp_vect;
 	// the masking is different for f48 compared to u48.
 	// with f48 we want to insert zeroes for the two lower bytes
-	__m128i mask = _mm_set_epi8(13, 12, 11, 10, 9, 8, 255, 255,
+	__m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 					5, 4, 3, 2, 1, 0, 255, 255);
     
 	// CHANGE SIZE TO SIZE OF ARRAY FROM POPULATION
-	for ( int i = 0; i < 4; i+= 2 ) {
+	for ( int i = 0; i < 3; i+= 2 ) {
 		// load vectors
 		__m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
 		a_vec = _mm_shuffle_epi8(a_vec, mask);
@@ -429,6 +428,7 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	}
 	// store result into double
 	_mm_storeu_pd(&total, result_vec);
+cout<<"RESULT IS: "<<total;
 	f48 total_result (total);
 	return total_result;
 }
@@ -460,20 +460,20 @@ int main()
 //f48 dummy48f (a);
 //cin>>a;
 int x;
-f48 * a = new f48[4];
-a[0] = f48(3.1);
-a[1] = f48(1.2);
-a[2] = f48(5.5);
-a[3] = f48(1.3);
-f48 * b = new f48[4];
-b[0] = f48(1);
-b[1] = f48(2);
-b[2] = f48(3);
-b[3] = f48(1.5);
+f48 * a = new f48[3];
+a[0] = f48(1.5);
+a[1] = f48(6);
+a[2] = f48(12);
+//a[3] = f48(1.3);
+f48 * b = new f48[3];
+b[0] = f48(3.4);
+b[1] = f48(33.22);
+b[2] = f48(4.6554);
+//b[3] = f48(1.5);
 f48 result;
 result = dot_product_SSE_f48(a,b);
-convert.l = (unsigned long long)result;
-cout<<"\n RESULT: "<<convert.d;
+// need conversion from f48 to double
+cout<<"\n RESULT: "<<(double)result;
 cin>>x;
   return 0;
 }
