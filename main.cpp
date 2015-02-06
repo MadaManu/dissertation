@@ -48,7 +48,6 @@ public:
 } __attribute__((packed));
 
 /************* class f48 ************************************/
-#pragma packed
 class f48 {
 private:
   unsigned long long num:48;  
@@ -58,15 +57,11 @@ public:
   operator double();
 } __attribute__((packed));
 
-union un {
-  double f;
-  u64 u;
-};
-
 #define INTEL_TYPE_CONVERSIONS 1
 #if INTEL_TYPE_CONVERSIONS
 f48::f48(double value)
 {
+  // TODO: optimize this code!
   // convert to 64-bit pattern
 //   u64 tmp = _castf64_u64(value);// not valid INTEL operation
   convert.d = value;
@@ -144,10 +139,6 @@ convert.l = result;
   this->num = result >> 16;
   
 }
-
-
-
-// TODO: implementation of BLAS
 
 f48::operator double()
 {
@@ -313,28 +304,22 @@ double sum_arrays_SSE_double(double * a, double * b, double *c)
 
 f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
 {
-  f48 * result = new f48[2]; // should be size
-  double * temp = new double[2];
+  f48 * result = new f48[size]; // should be size
+  double * temp = new double[size];
   __m128d result_vec = _mm_set1_pd(0.0);
-  // the masking is different for f48 compared to u48.
-  // with f48 we want to insert zeroes for the two lower bytes
   __m128i mask = _mm_set_epi8(11, 10, 9, 8,  7,  6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
-
-  __m128i scalar_mask = _mm_set_epi8(5,4,3,2,1,0,255,255,5,4,3,2,1,0,255,255);
-  __m128i scalar_vec = _mm_loadu_si128((__m128i*)(&scalar));
-  scalar_vec = _mm_shuffle_epi8(scalar_vec, scalar_mask);
-
-  for ( int i = 0; i < 2; i+= 2 ) {
+   double scalar_double = (double) scalar; // convert scalar to double - easier to load
+   __m128d scalar_vec = _mm_load1_pd(&scalar_double);
+  for ( int i = 0; i < size; i+= 2 ) { // should be size
     __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
     a_vec = _mm_shuffle_epi8(a_vec, mask);
-    result_vec = _mm_mul_pd((__m128d)a_vec, (__m128d)scalar_vec);
-    // store result back into the array
-    // TODO try to remove the use of temp
-    _mm_storeu_pd(&temp[0], (__m128d)result_vec);
-    // convert back to f48 and add to final result array
-    result[i] = f48(temp[0]);
-    result[i+1] = f48(temp[1]);
+    result_vec = _mm_mul_pd((__m128d)a_vec, scalar_vec);
+    _mm_store_pd(&temp[i], (__m128d)result_vec);    
+  }
+  // convert back to f48 and add to final result array
+  for(int i=0 ; i< size; i++){
+      result[i] = f48(temp[i]);
   }
   // return the result array
   return result;
@@ -342,18 +327,21 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
 
 double * scale_double_vector_SSE (double * a, double scalar)
 {
-  double * result = new double[2]; // should be size
+  double * result = new double[size]; // should be size
   __m128d scalar_vec = _mm_load1_pd(&scalar);
   __m128d result_vec = _mm_set1_pd(0.0);
   
-  for (int i=0; i<2; i+=2) { // should be size
+  for (int i=0; i<size; i+=2) { // should be size
     __m128d a_vec = _mm_load_pd(&a[i]);
     result_vec = _mm_mul_pd(a_vec, scalar_vec);
-    _mm_storeu_pd(&result[i], result_vec);
+    _mm_store_pd(&result[i], result_vec);
   }
+//   cout<<result[0]<<' '<<result[1];
   return result;
 }
 
+
+/***************** TEST FUNCTIONS **************/
 template <class T>
 void test_type(T dummy, string s)
 {
@@ -463,7 +451,7 @@ double dot_product_SSE_double (double *a, double *b) {
 	}
 	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
 	// store result into double
-	_mm_storeu_pd(&total, result_vec);
+	_mm_store_pd(&total, result_vec);
 	return total;
 }
 
@@ -490,7 +478,7 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	}
 	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
 	// store result into double
-	_mm_storeu_pd(&total, result_vec);
+	_mm_store_pd(&total, result_vec);
 	f48 total_result (total);
 	return total_result;
 }
@@ -610,14 +598,11 @@ void test_double_scale()
   }
 }
 
+
+/************* MAIN ***********************/
 int main()
 {
 
-// DEFINE SSE function to generate the dot product of 2 f48 SSE vectors	
-// load vectors with mask in __m128d
-// align data correctly
-// do the dot product (multiplication, addition, final horizontal addition after loop)
-// convert back to f48 and return result
 
 
 //  u48 dummy48u;
@@ -639,9 +624,9 @@ int main()
 
   
 // int x;
-// double a[2];
-//  a[0] = 1.5;
-//  a[1] = 6;
+// f48 a[2];
+//  a[0] = f48(3);
+//  a[1] = f48(3);
 // //a[3] = f48(1.3);
 //  double b[2];
 //  b[0] = 3;
@@ -654,10 +639,10 @@ int main()
 // cin>>x;
 
 // TESTING F48 dot prod and DOUBLE dot prod
-//   test_f48_dot_prod();
-//   test_double_dot_prod();
-test_f48_scale();
-test_double_scale();
-  
+  test_f48_dot_prod();
+  test_double_dot_prod();
+  test_f48_scale();
+  test_double_scale();
+
   return 0;
 }
