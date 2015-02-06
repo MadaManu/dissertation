@@ -451,34 +451,27 @@ double dot_product_SSE_double (double *a, double *b) {
 	}
 	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
 	// store result into double
-	_mm_store_pd(&total, result_vec);
+	_mm_store1_pd(&total, result_vec);
 	return total;
 }
 
 f48 dot_product_SSE_f48 (f48 *a, f48 *b){
-	
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
 	__m128d temp_vect;
-	// the masking is different for f48 compared to u48.
-	// with f48 we want to insert zeroes for the two lower bytes
 	__m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 					5, 4, 3, 2, 1, 0, 255, 255);
-    
+
 	for ( int i = 0; i < size; i+= 2 ) {
-		// load vectors
 		__m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
 		a_vec = _mm_shuffle_epi8(a_vec, mask);
 		__m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
 		b_vec = _mm_shuffle_epi8(b_vec, mask);
-		// a & b vectors loaded
-		// compute multiplication and save temporary = a[1]*b[1]   a[0]*b[0]
 		 temp_vect = _mm_mul_pd((__m128d)a_vec, (__m128d)b_vec);
 		 result_vec = _mm_add_pd(temp_vect, result_vec);  //performs vertical addition
 	}
 	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
-	// store result into double
-	_mm_store_pd(&total, result_vec);
+	_mm_store1_pd(&total, result_vec);
 	f48 total_result (total);
 	return total_result;
 }
@@ -486,116 +479,100 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 void test_f48_dot_prod()
 {
   cout<<"f48 dot product" << endl;
-  cout<<"RDTSC diff, CLOCK diff, result, size of type" << endl;
+  cout<<"RDTSC diff" << endl;
   f48 * a = new f48[size];
   f48 * b = new f48[size];
 
   populate_array(a);
   populate_array(b);
 
-  clock_t start_clock, end_clock;
-  double elapsed;
   u64 start;
   f48 dot_prod;
   u64 stop;
   u64 diff;
 
-  for ( int i = 0; i < 10; i++ ) {
-    start_clock = clock();
+  for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
     dot_prod = dot_product_SSE_f48(a, b);
     stop = rdtsc();
-    end_clock = clock();
     diff = stop - start;
-    elapsed = ((double) (end_clock - start_clock)) / CLOCKS_PER_SEC;
-    cout << diff << "," << elapsed << "," << dot_prod << ","<< sizeof(f48) << endl;
+    cout << diff << ',';
   }
+  cout<<endl;
 }
 
 void test_double_dot_prod()
 {
   cout<<"DOUBLE dot product" << endl;
-  cout<<"RDTSC diff, CLOCK diff, result, size of type" << endl;
+  cout<<"RDTSC diff" << endl;
   double * a = new double[size];
   double * b = new double[size];
 
   populate_array(a);
   populate_array(b);
 
-  clock_t start_clock, end_clock;
-  double elapsed;
   u64 start;
   double dot_prod;
   u64 stop;
   u64 diff;
 
-  for ( int i = 0; i < 10; i++ ) {
-    start_clock = clock();
+  for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
     dot_prod = dot_product_SSE_double(a, b);
     stop = rdtsc();
-    end_clock = clock();
     diff = stop - start;
-    elapsed = ((double) (end_clock - start_clock)) / CLOCKS_PER_SEC;
-    cout << diff << "," << elapsed << "," << dot_prod << ","<< sizeof(double) << endl;
+    cout << diff << ',';
   }
 }
 
 void test_f48_scale()
 {
   cout<<"f48 scale vector " << endl;
-  cout<<"RDTSC diff, CLOCK diff, result, size of type" << endl;
+  cout<<"RDTSC diff" << endl;
   f48 * a = new f48[size];
   populate_array(a);
   srand(5);
   f48 scalar = f48(rand() % 1024);
 
-  clock_t start_clock, end_clock;
-  double elapsed;
   u64 start;
   f48 * scaled_res;
   u64 stop;
   u64 diff;
 
-  for ( int i = 0; i < 10; i++ ) {
-    start_clock = clock();
+  for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
     scaled_res = scale_f48_vector_SSE(a, scalar);
     stop = rdtsc();
-    end_clock = clock();
     diff = stop - start;
-    elapsed = ((double) (end_clock - start_clock)) / CLOCKS_PER_SEC;
-    cout << diff << "," << elapsed << "," << scaled_res << ","<< sizeof(f48) << endl;
+
+    cout << diff << ",";
   }
+  cout<<endl;
 }
 
 void test_double_scale()
 {
   cout<<"DOUBLE scale vector" << endl;
-  cout<<"RDTSC diff, CLOCK diff, result, size of type" << endl;
+  cout<<"RDTSC diff" << endl;
   double * a = new double[size];
   srand(5);
   double scalar = rand() % 1024;
 
   populate_array(a);
 
-  clock_t start_clock, end_clock;
-  double elapsed;
   u64 start;
   double * scale_res;
   u64 stop;
   u64 diff;
 
-  for ( int i = 0; i < 10; i++ ) {
-    start_clock = clock();
+  for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
     scale_res = scale_double_vector_SSE(a, scalar);
     stop = rdtsc();
-    end_clock = clock();
     diff = stop - start;
-    elapsed = ((double) (end_clock - start_clock)) / CLOCKS_PER_SEC;
-    cout << diff << "," << elapsed << "," << scale_res << ","<< sizeof(double) << endl;
+    cout << diff << ",";
   }
+  cout<<endl;
 }
 
 
@@ -628,9 +605,12 @@ int main()
 //  a[0] = f48(3);
 //  a[1] = f48(3);
 // //a[3] = f48(1.3);
-//  double b[2];
-//  b[0] = 3;
-//  b[1] = 3;
+ double b[2];
+ b[0] = 3;
+ b[1] = 3;
+  double c[2];
+ c[0] = 3;
+ c[1] = 3;
 // //b[3] = f48(1.5);
 // double result;
 // result = dot_product_SSE_double(a,b);
@@ -639,8 +619,9 @@ int main()
 // cin>>x;
 
 // TESTING F48 dot prod and DOUBLE dot prod
-  test_f48_dot_prod();
-  test_double_dot_prod();
+//   test_f48_dot_prod();
+//   test_double_dot_prod();
+// TESTING F48 and DOUBLE SCALE
   test_f48_scale();
   test_double_scale();
 
