@@ -410,19 +410,15 @@ double dot_product_SSE_double (double *a, double *b) {
 	__m128d temp_vect;
     
 	for ( int i = 0; i < size; i+= 2 ) {
-		__m128i mask = _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8,
-					7, 6, 5, 4, 3, 2, 1, 0);
 		// load vectors
-		__m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
-		a_vec = _mm_shuffle_epi8(a_vec, mask);
-		__m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
-		b_vec = _mm_shuffle_epi8(b_vec, mask);
+		__m128d a_vec = _mm_load_pd(&a[i]);
+		__m128d b_vec = _mm_load_pd(&b[i]);
 		// a & b vectors loaded
 		// compute multiplication and save temporary = a[1]*b[1]   a[0]*b[0]
-		 temp_vect = _mm_mul_pd((__m128d)a_vec, (__m128d)b_vec);
-		 temp_vect = _mm_hadd_pd(temp_vect, temp_vect);  //performs vertical addition
-		 result_vec = _mm_add_pd(result_vec, temp_vect); // cumulate result
+		 temp_vect = _mm_mul_pd(a_vec, b_vec);
+		 result_vec = _mm_add_pd(temp_vect, result_vec);  //performs vertical addition
 	}
+	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
 	// store result into double
 	_mm_storeu_pd(&total, result_vec);
 	return total;
@@ -447,9 +443,9 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 		// a & b vectors loaded
 		// compute multiplication and save temporary = a[1]*b[1]   a[0]*b[0]
 		 temp_vect = _mm_mul_pd((__m128d)a_vec, (__m128d)b_vec);
-		 temp_vect = _mm_hadd_pd(temp_vect, temp_vect);  //performs vertical addition
-		 result_vec = _mm_add_pd(result_vec, temp_vect); // cumulate result
+		 result_vec = _mm_add_pd(temp_vect, result_vec);  //performs vertical addition
 	}
+	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
 	// store result into double
 	_mm_storeu_pd(&total, result_vec);
 	f48 total_result (total);
@@ -543,20 +539,18 @@ int main()
 
   
 // int x;
-// f48 * a = new f48[3];
-// a[0] = f48(1.5);
-// a[1] = f48(6);
-// a[2] = f48(12);
+// double a[2];
+//  a[0] = 1.5;
+//  a[1] = 6;
 // //a[3] = f48(1.3);
-// f48 * b = new f48[3];
-// b[0] = f48(3.4);
-// b[1] = f48(33.22);
-// b[2] = f48(4.6554);
+//  double b[2];
+//  b[0] = 3;
+//  b[1] = 3;
 // //b[3] = f48(1.5);
-// f48 result;
-// result = dot_product_SSE_f48(a,b);
+// double result;
+// result = dot_product_SSE_double(a,b);
 // // need conversion from f48 to double
-// cout<<"\n RESULT: "<<(double)result;
+// cout<<"\n RESULT: "<<result;
 // cin>>x;
 
   test_f48_dot_prod();
