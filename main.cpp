@@ -307,9 +307,12 @@ __m128d convert_double_f48_SSE (__m128i a)
 	// convert from 2 double in vector to 2 rounded f48
 	__m128d result = _mm_set1_pd(0.0); // setting result
 	// define mask to extract the bits that are to be removed
-	__m128i mask = _mm_set_epi8(255,255,255,255,255,255,12,13,
-				    255,255,255,255,255,255,6,7);
+	__m128i mask = _mm_set_epi8(255,255,255,255,255,255,9,8,
+				    255,255,255,255,255,255,1,0);
 	__m128i extra_bits = _mm_shuffle_epi8(a, mask);
+	mask = _mm_set_epi8(15,14,13,12,11,10,255, 255,
+			    7, 6, 5, 4, 3, 2, 255, 255);
+	__m128i choppedoff_bits = _mm_shuffle_epi8(a, mask);
 }
 
 f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
