@@ -302,6 +302,16 @@ double sum_arrays_SSE_double(double * a, double * b, double *c)
   return result;
 }
 
+__m128d convert_double_f48_SSE (__m128i a)
+{
+	// convert from 2 double in vector to 2 rounded f48
+	__m128d result = _mm_set1_pd(0.0); // setting result
+	// define mask to extract the bits that are to be removed
+	__m128i mask = _mm_set_epi8(255,255,255,255,255,255,12,13,
+				    255,255,255,255,255,255,6,7);
+	__m128i extra_bits = _mm_shuffle_epi8(a, mask);
+}
+
 f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
 {
   f48 * result = new f48[size]; // should be size
@@ -315,6 +325,7 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
     a_vec = _mm_shuffle_epi8(a_vec, mask);
     result_vec = _mm_mul_pd((__m128d)a_vec, scalar_vec);
+	__m128d test = convert_double_f48_SSE((__m128i)result_vec);
     _mm_store_pd(&temp[i], (__m128d)result_vec);    
   }
   // convert back to f48 and add to final result array
@@ -539,7 +550,7 @@ void test_f48_scale()
   u64 stop;
   u64 diff;
 
-  for ( int i = 0; i < 100; i++ ) {
+  for ( int i = 0; i < 1; i++ ) {
     start = rdtsc();
     scaled_res = scale_f48_vector_SSE(a, scalar);
     stop = rdtsc();
@@ -623,7 +634,7 @@ int main()
 //   test_double_dot_prod();
 // TESTING F48 and DOUBLE SCALE
   test_f48_scale();
-  test_double_scale();
+//  test_double_scale();
 
   return 0;
 }
