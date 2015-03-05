@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <bitset>
 #include <time.h>
+#include <fstream>
 
 
 using namespace std;
@@ -312,7 +313,7 @@ __m128d convert_double_f48_SSE (__m128i a)
 	__m128i extra_bits = _mm_shuffle_epi8(a, mask);
 	mask = _mm_set_epi8(15,14,13,12,11,10,255, 255,
 			    7, 6, 5, 4, 3, 2, 255, 255);
-	__m128i choppedoff_bits = _mm_shuffle_epi8(a, mask);
+	__m128i remaining_bits = _mm_shuffle_epi8(a, mask);
 }
 
 f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
@@ -449,6 +450,7 @@ void test_double_vec()
   }
 }
 
+// TODO: function to take size
 double dot_product_SSE_double (double *a, double *b) {
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
@@ -469,6 +471,7 @@ double dot_product_SSE_double (double *a, double *b) {
 	return total;
 }
 
+// TODO: function to take size
 f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
@@ -488,6 +491,119 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	_mm_store1_pd(&total, result_vec);
 	f48 total_result (total);
 	return total_result;
+}
+
+// TODO: function to take size
+f48 absolute_max_SSE_f48 (f48 *a){
+  __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+			       5,  4, 3, 2, 1, 0, 255, 255);
+  // load the first two as being the max 
+  __m128i max = _mm_loadu_si128((__m128i*)(&a[0]));
+  max = _mm_shuffle_epi8(max, mask);
+  for ( int i = 2; i < size; i+= 2 ) { // start loop from the third element two by two until the end
+    __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
+    a_vec = _mm_shuffle_epi8(a_vec, mask);
+    max = (__m128i)_mm_max_pd((__m128d)max, (__m128d)a_vec);
+  }
+  // at the end compare max with suffle max and find the maximum value that needs to be stored in a double that requires conversion back to f48
+  mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i max_shuffled = _mm_shuffle_epi8(max, mask);
+  __m128d max_result = _mm_max_pd((__m128d)max, (__m128d)max_shuffled);
+  // store one of max into a double and print double
+  double maximum;
+  _mm_store_pd(&maximum, max_result);
+  f48 max_f48 (maximum);
+  return max_f48;
+}
+
+// TODO: function to take size
+f48 absolute_min_SSE_f48 (f48 *a) {
+    __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+			       5,  4, 3, 2, 1, 0, 255, 255);
+  // load the first two as being the min 
+  __m128i min = _mm_loadu_si128((__m128i*)(&a[0]));
+  min = _mm_shuffle_epi8(min, mask);
+  for ( int i = 2; i < size; i+= 2 ) { // start loop from the third element two by two until the end
+    __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
+    a_vec = _mm_shuffle_epi8(a_vec, mask);
+    min = (__m128i)_mm_min_pd((__m128d)min, (__m128d)a_vec);
+  }
+  // at the end compare min with suffle min and find the maximum value that needs to be stored in a double that requires conversion back to f48
+  mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i min_shuffled = _mm_shuffle_epi8(min, mask);
+  __m128d min_result = _mm_min_pd((__m128d)min, (__m128d)min_shuffled);
+  // store one of min into a double and print double
+  double minimum;
+  _mm_store_pd(&minimum, min_result);
+  f48 max_f48 (minimum);
+  return max_f48;
+}
+
+// TODO: function to take size
+double absolute_max_SSE_double (double *a){
+  __m128d max = _mm_load_pd(&a[0]);
+  for ( int i = 2; i < size; i+= 2 ) { 
+    __m128d a_vec = _mm_load_pd(&a[i]);
+    max = _mm_max_pd(max, a_vec);
+  }
+  __m128i mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i max_shuffled = _mm_shuffle_epi8((__m128i)max, mask);
+  __m128d max_result = _mm_max_pd(max, (__m128d)max_shuffled);
+  double maximum;
+  _mm_store_pd(&maximum, max_result);
+  return maximum;
+}
+
+// TODO: function to take size
+double absolute_min_SSE_double (double *a){
+  __m128d min = _mm_load_pd(&a[0]);
+  for ( int i = 2; i < size; i+= 2 ) { 
+    __m128d a_vec = _mm_load_pd(&a[i]);
+    min = _mm_min_pd(min, a_vec);
+  }
+  __m128i mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i min_shuffled = _mm_shuffle_epi8((__m128i)min, mask);
+  __m128d min_result = _mm_min_pd(min, (__m128d)min_shuffled);
+  double minimum;
+  _mm_store_pd(&minimum, min_result);
+  return minimum;
+}
+
+// TODO: function to take size
+f48 magnitude_SSE_f48 (f48 *a){
+  __m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
+  __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+			       5,  4, 3, 2, 1, 0, 255, 255);
+  for(int i=0; i<size; i+=2){
+   __m128i a_vect = _mm_loadu_si128((__m128i*)(&a[i]));
+   a_vect = _mm_shuffle_epi8(a_vect, mask);
+   a_vect = (__m128i)_mm_mul_pd((__m128d)a_vect,(__m128d)a_vect); // ^2
+   result_vec = _mm_add_pd(result_vec, (__m128d)a_vect); // running sum
+  }
+  result_vec = _mm_hadd_pd(result_vec, result_vec);
+  result_vec = _mm_sqrt_pd(result_vec);
+  double res;
+  _mm_store_pd(&res, result_vec);
+  return f48(res);
+}
+
+// TODO: function to take size
+double magnitude_SSE_double (double *a){
+  __m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
+  for ( int i = 0; i < size; i+= 2 ) { 
+    __m128d a_vect = _mm_load_pd(&a[i]);
+    a_vect = _mm_mul_pd(a_vect, a_vect); // ^2
+    result_vec = _mm_add_pd(result_vec, a_vect); // running sum
+  }
+  result_vec = _mm_hadd_pd(result_vec, result_vec);
+  result_vec = _mm_sqrt_pd(result_vec);
+  double res;
+  _mm_store_pd(&res, result_vec);
+  return res;
 }
 
 void test_f48_dot_prod()
@@ -589,7 +705,195 @@ void test_double_scale()
   cout<<endl;
 }
 
+void test_max_f48_SSE()
+{
+  cout<<"f48 max SSE" << endl;
+  cout<<"RDTSC diff" << endl;
+  f48 * a = new f48[size];
 
+  populate_array(a);
+
+  u64 start;
+  f48 dot_prod;
+  u64 stop;
+  u64 diff;
+
+  for ( int i = 0; i < 100; i++ ) {
+    start = rdtsc();
+    dot_prod = absolute_max_SSE_f48(a);
+    stop = rdtsc();
+    diff = stop - start;
+    cout << diff << ',';
+  }
+  cout<<endl;
+}
+
+void test_min_f48_SSE()
+{
+  cout<<"f48 min SSE" << endl;
+  cout<<"RDTSC diff" << endl;
+  f48 * a = new f48[size];
+
+  populate_array(a);
+
+  u64 start;
+  f48 dot_prod;
+  u64 stop;
+  u64 diff;
+
+  for ( int i = 0; i < 100; i++ ) {
+    start = rdtsc();
+    dot_prod = absolute_min_SSE_f48(a);
+    stop = rdtsc();
+    diff = stop - start;
+    cout << diff << ',';
+  }
+  cout<<endl;
+}
+
+
+void test_max_double_SSE()
+{
+  cout<<"DOUBLE max SSE" << endl;
+  cout<<"RDTSC diff" << endl;
+  double * a = new double[size];
+
+  populate_array(a);
+
+  u64 start;
+  double dot_prod;
+  u64 stop;
+  u64 diff;
+
+  for ( int i = 0; i < 100; i++ ) {
+    start = rdtsc();
+    dot_prod = absolute_max_SSE_double(a);
+    stop = rdtsc();
+    diff = stop - start;
+    cout << diff << ',';
+  }
+}
+
+void test_min_double_SSE()
+{
+  cout<<"DOUBLE min SSE" << endl;
+  cout<<"RDTSC diff" << endl;
+  double * a = new double[size];
+
+  populate_array(a);
+
+  u64 start;
+  double dot_prod;
+  u64 stop;
+  u64 diff;
+
+  for ( int i = 0; i < 100; i++ ) {
+    start = rdtsc();
+    dot_prod = absolute_min_SSE_double(a);
+    stop = rdtsc();
+    diff = stop - start;
+    cout << diff << ',';
+  }
+}
+
+void test_magnitude_f48_SSE()
+{
+  cout<<"f48 magnitude SSE..." << endl;
+  f48 * a = new f48[size];
+
+  populate_array(a);
+
+  u64 start;
+  f48 dot_prod;
+  u64 stop;
+  u64 diff;
+  
+  // preparing file
+  ofstream myfile;
+  myfile.open ("results/magnitude_SSE_f48.txt");
+  
+  for ( int i = 0; i < 100; i++ ) {
+    start = rdtsc();
+    dot_prod = magnitude_SSE_f48(a);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile <<diff<<endl;
+//     cout << diff << ',';
+  }
+  myfile.close();
+  cout<<"Done. Results in results/magnitude_SSE_f48.txt "<<endl;
+}
+
+void test_magnitude_double_SSE()
+{
+  cout<<"DOUBLE magnitude SSE..." << endl;
+  double * a = new double[size];
+
+  populate_array(a);
+
+  u64 start;
+  double dot_prod;
+  u64 stop;
+  u64 diff;
+  
+  // preparing file
+  ofstream myfile;
+  myfile.open ("results/magnitude_SSE_double.txt");
+
+  for ( int i = 0; i < 100; i++ ) {
+    start = rdtsc();
+    dot_prod = magnitude_SSE_double(a);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile <<diff<<endl;
+//     cout << diff << ',';
+  }
+  myfile.close();
+  cout<<"Done. Results in results/magnitude_SSE_double.txt "<<endl;
+}
+
+void build_report_magnitude()
+{
+  cout<<"Compiling results in main magnitude report..."<<endl;
+  ofstream myfile;
+  myfile.open ("results/magnitude_report.txt");
+  
+  myfile<<"Magnitude test (f48 vs double)"<<endl;
+  myfile<<"SSE f48, SSE double"<<endl;
+  string results[100]; // TODO: use the test results number from global here!
+  string line;
+  ifstream mag_f48 ("results/magnitude_SSE_double.txt");
+  int i=0;
+  if (mag_f48.is_open())
+  {
+    while ( getline (mag_f48,line) )
+    {
+      results[i] = line;
+      i++;
+    }
+    mag_f48.close();
+  }
+  
+  ifstream mag_double ("results/magnitude_SSE_f48.txt");
+  i=0;
+  if (mag_double.is_open())
+  {
+    while ( getline (mag_double,line) )
+    {
+      myfile<<results[i]<<","<<line<<endl;
+      i++;
+    }
+    mag_double.close();
+  }
+
+  else cout << "Unable to open file"; 
+
+  
+  myfile.close();
+  cout<<"Magnitude results compiled for f48 and double. (results/magnitude_report.txt)"<<endl;
+}
+
+// TODO: add number of runs for test results global
 /************* MAIN ***********************/
 int main()
 {
@@ -615,16 +919,17 @@ int main()
 
   
 // int x;
-// f48 a[2];
-//  a[0] = f48(3);
-//  a[1] = f48(3);
-// //a[3] = f48(1.3);
+f48 a[2];
+ a[0] = f48(2);
+ a[1] = f48(3);
+//  a[2] = f48(2.1);
+// a[3] = f48(7.1);
  double b[2];
- b[0] = 3;
- b[1] = 3;
-  double c[2];
- c[0] = 3;
- c[1] = 3;
+ b[0] = 3.4;
+ b[1] = -1.3;
+//   double c[2];
+//  c[0] = 3.8;
+//  c[1] = 3.1;
 // //b[3] = f48(1.5);
 // double result;
 // result = dot_product_SSE_double(a,b);
@@ -636,8 +941,19 @@ int main()
 //   test_f48_dot_prod();
 //   test_double_dot_prod();
 // TESTING F48 and DOUBLE SCALE
-  test_f48_scale();
+//   test_f48_scale();
 //  test_double_scale();
+ 
+//  test_max_f48_SSE();
+//  test_max_double_SSE();
+//  test_min_f48_SSE();
+//  test_min_double_SSE();
 
+  
+//   magnitude_SSE_double(b);
+ 
+ test_magnitude_f48_SSE();
+ test_magnitude_double_SSE();
+ build_report_magnitude();
   return 0;
 }
