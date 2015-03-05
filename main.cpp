@@ -511,8 +511,8 @@ f48 absolute_max_SSE_f48 (f48 *a){
   __m128i max_shuffled = _mm_shuffle_epi8(max, mask);
   __m128d max_result = _mm_max_pd((__m128d)max, (__m128d)max_shuffled);
   // store one of max into a double and print double
-  double maximum;
-  _mm_store_pd(&maximum, max_result);
+  double maximum=0;
+  _mm_store1_pd(&maximum, max_result);
   f48 max_f48 (maximum);
   return max_f48;
 }
@@ -535,8 +535,8 @@ f48 absolute_min_SSE_f48 (f48 *a) {
   __m128i min_shuffled = _mm_shuffle_epi8(min, mask);
   __m128d min_result = _mm_min_pd((__m128d)min, (__m128d)min_shuffled);
   // store one of min into a double and print double
-  double minimum;
-  _mm_store_pd(&minimum, min_result);
+  double minimum=0;
+  _mm_store1_pd(&minimum, min_result);
   f48 max_f48 (minimum);
   return max_f48;
 }
@@ -552,8 +552,8 @@ double absolute_max_SSE_double (double *a){
 		      15, 14, 13, 12, 11, 10, 9, 8);
   __m128i max_shuffled = _mm_shuffle_epi8((__m128i)max, mask);
   __m128d max_result = _mm_max_pd(max, (__m128d)max_shuffled);
-  double maximum;
-  _mm_store_pd(&maximum, max_result);
+  double maximum=0;
+  _mm_store1_pd(&maximum, max_result);
   return maximum;
 }
 
@@ -568,8 +568,8 @@ double absolute_min_SSE_double (double *a){
 		      15, 14, 13, 12, 11, 10, 9, 8);
   __m128i min_shuffled = _mm_shuffle_epi8((__m128i)min, mask);
   __m128d min_result = _mm_min_pd(min, (__m128d)min_shuffled);
-  double minimum;
-  _mm_store_pd(&minimum, min_result);
+  double minimum=0;
+  _mm_store1_pd(&minimum, min_result);
   return minimum;
 }
 
@@ -586,8 +586,8 @@ f48 magnitude_SSE_f48 (f48 *a){
   }
   result_vec = _mm_hadd_pd(result_vec, result_vec);
   result_vec = _mm_sqrt_pd(result_vec);
-  double res;
-  _mm_store_pd(&res, result_vec);
+  double res=0;
+  _mm_store1_pd(&res, result_vec);
   return f48(res);
 }
 
@@ -601,8 +601,8 @@ double magnitude_SSE_double (double *a){
   }
   result_vec = _mm_hadd_pd(result_vec, result_vec);
   result_vec = _mm_sqrt_pd(result_vec);
-  double res;
-  _mm_store_pd(&res, result_vec);
+  double res=0;
+  _mm_store1_pd(&res, result_vec);
   return res;
 }
 
@@ -817,7 +817,7 @@ void test_magnitude_f48_SSE()
     dot_prod = magnitude_SSE_f48(a);
     stop = rdtsc();
     diff = stop - start;
-    myfile <<diff<<endl;
+    myfile<<diff<<endl;
 //     cout << diff << ',';
   }
   myfile.close();
