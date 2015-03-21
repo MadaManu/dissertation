@@ -9,7 +9,6 @@
 #include <time.h>
 #include <fstream>
 
-
 using namespace std;
 
 const int size = 1024 * 1024;
@@ -135,7 +134,7 @@ f48::f48(double value)
 // to convert the number back to double there is a need of having the conversion 
 // done in the union (convert)
 convert.l = result;
-//cout<<convert.d;
+// cout<<convert.d;
 	// compensate for little endianess
   this->num = result >> 16;
   
@@ -303,17 +302,37 @@ double sum_arrays_SSE_double(double * a, double * b, double *c)
   return result;
 }
 
-__m128d convert_double_f48_SSE (__m128i a)
+__m128i convert_double_to_f48_SSE (__m128i a)
 {
 	// convert from 2 double in vector to 2 rounded f48
-	__m128d result = _mm_set1_pd(0.0); // setting result
 	// define mask to extract the bits that are to be removed
-	__m128i mask = _mm_set_epi8(255,255,255,255,255,255,9,8,
-				    255,255,255,255,255,255,1,0);
-	__m128i extra_bits = _mm_shuffle_epi8(a, mask);
-	mask = _mm_set_epi8(15,14,13,12,11,10,255, 255,
+// 	__m128i mask = _mm_set_epi8(255,255,255,255,255,255,9,8,
+// 				    255,255,255,255,255,255,1,0);
+// 	__m128i extra_bits = _mm_shuffle_epi8(a, mask);
+  
+	__m128i mask = _mm_set_epi8(15,14,13,12,11,10,255, 255,
 			    7, 6, 5, 4, 3, 2, 255, 255);
-	__m128i remaining_bits = _mm_shuffle_epi8(a, mask);
+	__m128i unrounded_result = _mm_shuffle_epi8(a, mask);
+	
+	
+	
+	// NEW implementation!!!
+	__m128d s_mask = _mm_set_pd(0.0,1.61890490173e-319);  // 0000000000000000000000000000000000000000000000000111111111111111
+							     // 0x7fff ^^ - to be added for S
+	__m128i s = _mm_and_si128(a, (__m128i)s_mask); // remove all the other stuff before S and extract S bits (last bits after R being removed)
+	s = (__m128i)_mm_add_pd((__m128d)s, (__m128d)s_mask); // add 0x7fff to obtain S in overflow at position of R
+	__m128d r_mask = _mm_set_pd(0.0,8.09477154146e-320); // 0000000000000000000000000000000000000000000000000100000000000000
+							      // 0x4000 && - to be used to select R
+	__m128i r = _mm_and_si128(a, (__m128i)r_mask); // select the R bit
+	__m128i r_or_s = _mm_or_si128(s,r);  // R|S in the position of R
+	
+	__m128d shift_count = _mm_set1_pd(1.0);
+	r_or_s = _mm_sll_epi64(r_or_s, (__m128i)shift_count); // shift R|S to left by 1 to match the position of G
+	
+	__m128d result = _mm_add_pd((__m128d)unrounded_result, (__m128d)r_or_s);
+	
+	return (__m128i)_mm_shuffle_epi8((__m128i)result, mask); // apply truncation mask
+	// TODO: required permutation / shifting
 }
 
 f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
@@ -329,7 +348,7 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
     a_vec = _mm_shuffle_epi8(a_vec, mask);
     result_vec = _mm_mul_pd((__m128d)a_vec, scalar_vec);
-	__m128d test = convert_double_f48_SSE((__m128i)result_vec);
+	__m128i test = convert_double_to_f48_SSE((__m128i)result_vec);
     _mm_store_pd(&temp[i], (__m128d)result_vec);    
   }
   // convert back to f48 and add to final result array
@@ -925,8 +944,8 @@ f48 a[2];
 //  a[2] = f48(2.1);
 // a[3] = f48(7.1);
  double b[2];
- b[0] = 3.4;
- b[1] = -1.3;
+ b[0] = 4.25649874;
+ b[1] = 122.216548;
 //   double c[2];
 //  c[0] = 3.8;
 //  c[1] = 3.1;
@@ -952,8 +971,13 @@ f48 a[2];
   
 //   magnitude_SSE_double(b);
  
- test_magnitude_f48_SSE();
- test_magnitude_double_SSE();
- build_report_magnitude();
+//  test_magnitude_f48_SSE();
+//  test_magnitude_double_SSE();
+//  build_report_magnitude();
+ 
+ __m128i a_vec = _mm_loadu_si128((__m128i*)(&b[0]));
+ __m128i result = convert_double_to_f48_SSE(a_vec);
+ _mm_store_pd(&b[0],(__m128d)result);
+
   return 0;
 }
