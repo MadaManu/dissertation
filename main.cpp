@@ -8,6 +8,8 @@
 #include <bitset>
 #include <time.h>
 #include <fstream>
+#include <stdio.h>
+#include <string.h>
 
 using namespace std;
 
@@ -304,24 +306,16 @@ double sum_arrays_SSE_double(double * a, double * b, double *c)
 
 __m128i convert_double_to_f48_SSE (__m128i a)
 {
-	// convert from 2 double in vector to 2 rounded f48
-	// define mask to extract the bits that are to be removed
-// 	__m128i mask = _mm_set_epi8(255,255,255,255,255,255,9,8,
-// 				    255,255,255,255,255,255,1,0);
-// 	__m128i extra_bits = _mm_shuffle_epi8(a, mask);
-  
+	// convert from 2 double in vector to 2 rounded f48  
 	__m128i mask = _mm_set_epi8(15,14,13,12,11,10,255, 255,
 			    7, 6, 5, 4, 3, 2, 255, 255);
 	__m128i unrounded_result = _mm_shuffle_epi8(a, mask);
-	
-	
-	
-	// NEW implementation!!!
-	__m128d s_mask = _mm_set_pd(0.0,1.61890490173e-319);  // 0000000000000000000000000000000000000000000000000111111111111111
+
+	__m128d s_mask = _mm_set_pd(1.61890490173e-319,1.61890490173e-319);  // 0000000000000000000000000000000000000000000000000111111111111111
 							     // 0x7fff ^^ - to be added for S
 	__m128i s = _mm_and_si128(a, (__m128i)s_mask); // remove all the other stuff before S and extract S bits (last bits after R being removed)
 	s = (__m128i)_mm_add_pd((__m128d)s, (__m128d)s_mask); // add 0x7fff to obtain S in overflow at position of R
-	__m128d r_mask = _mm_set_pd(0.0,8.09477154146e-320); // 0000000000000000000000000000000000000000000000000100000000000000
+	__m128d r_mask = _mm_set_pd(8.09477154146e-320,8.09477154146e-320); // 0000000000000000000000000000000000000000000000000100000000000000
 							      // 0x4000 && - to be used to select R
 	__m128i r = _mm_and_si128(a, (__m128i)r_mask); // select the R bit
 	__m128i r_or_s = _mm_or_si128(s,r);  // R|S in the position of R
@@ -331,32 +325,103 @@ __m128i convert_double_to_f48_SSE (__m128i a)
 	
 	__m128d result = _mm_add_pd((__m128d)unrounded_result, (__m128d)r_or_s);
 	
-	return (__m128i)_mm_shuffle_epi8((__m128i)result, mask); // apply truncation mask
-	// TODO: required permutation / shifting
+	// permute to left
+	__m128i permute_mask = _mm_set_epi8(15, 14, 13, 12, 11, 10, 7, 6,
+			    5, 4, 3, 2, 255, 255, 255, 255);
+	
+	return (__m128i)_mm_shuffle_epi8((__m128i)result, permute_mask); // apply permutation mask
+// 	return (__m128i)result;
 }
 
 f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
 {
-  f48 * result = new f48[size]; // should be size
-  double * temp = new double[size];
-  __m128d result_vec = _mm_set1_pd(0.0);
+   double double_scalar = (double)scalar;
+  __m128d scalar_vec = _mm_load1_pd(&double_scalar);
+  // set the mask to be used by loading in the unrolled loop
   __m128i mask = _mm_set_epi8(11, 10, 9, 8,  7,  6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
-   double scalar_double = (double) scalar; // convert scalar to double - easier to load
-   __m128d scalar_vec = _mm_load1_pd(&scalar_double);
-  for ( int i = 0; i < size; i+= 2 ) { // should be size
-    __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
-    a_vec = _mm_shuffle_epi8(a_vec, mask);
-    result_vec = _mm_mul_pd((__m128d)a_vec, scalar_vec);
-	__m128i test = convert_double_to_f48_SSE((__m128i)result_vec);
-    _mm_store_pd(&temp[i], (__m128d)result_vec);    
+  
+   
+  for ( int i = 0; i < 8; i+=8 ) { // should be size
+    // ^^ for loop unrolling to work need to loop around 8 elements
+    __m128i a01 = _mm_loadu_si128((__m128i*)(&a[i])); // load a[0] and a[1]
+    a01 = _mm_shuffle_epi8(a01, mask);
+    
+    __m128i a23 = _mm_loadu_si128((__m128i*)(&a[i+2])); // load a[2] and a[3]
+    a23 = _mm_shuffle_epi8(a23, mask);
+    
+    __m128i a45 = _mm_loadu_si128((__m128i*)(&a[i+4])); // load a[4] and a[5]
+    a45 = _mm_shuffle_epi8(a45, mask);
+    
+    __m128i a67 = _mm_loadu_si128((__m128i*)(&a[i+6])); // load a[6] and a[7]
+    a67 = _mm_shuffle_epi8(a67, mask);
+    
+    
+    
+    // SCALE THEM UP
+    __m128d res_a01 = _mm_mul_pd((__m128d)a01, (__m128d)scalar_vec);
+    __m128d res_a23 = _mm_mul_pd((__m128d)a23, (__m128d)scalar_vec);
+    __m128d res_a45 = _mm_mul_pd((__m128d)a45, (__m128d)scalar_vec);
+    __m128d res_a67 = _mm_mul_pd((__m128d)a67, (__m128d)scalar_vec);
+    
+    //ROUND THEM!!!
+    __m128i a01_round = convert_double_to_f48_SSE((__m128i)res_a01);
+    __m128i a23_round = convert_double_to_f48_SSE((__m128i)res_a23);
+    __m128i a45_round = convert_double_to_f48_SSE((__m128i)res_a45);
+    __m128i a67_round = convert_double_to_f48_SSE((__m128i)res_a67);
+    
+    _mm_store_pd((double*)&a[0], (__m128d)a01_round);    
+    cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<endl;
+    
+    
+    // TEST
+    double * result = new double[2]; // should be size
+    _mm_store_pd(&result[0], (__m128d)a01_round);
+    cout<<result[0]<<" "<<result[1]<<endl;
+//     _mm_store_pd(&result[0], (__m128d)res_a23);
+//     cout<<result[0]<<" "<<result[1]<<endl;
+    
+    // place them right for memory write
+    
+    
+    
+//     __m128i a01 = _mm_loadu_si128((__m128i*)(&a[i]));
+//     a01 = _mm_shuffle_epi8(a01, mask);
+//     res_a = _mm_mul_pd((__m128d)a01, scalar_vec);
+//     __m128i b_vec = _mm_loadu_si128((__m128i*)(&a[i+2]));
+//     b_vec = _mm_shuffle_epi8(b_vec, mask);
+//     res_b = _mm_mul_pd((__m128d)b_vec, scalar_vec);
+//     __m128i c_vec = _mm_loadu_si128((__m128i*)(&a[i+4]));
+//     c_vec = _mm_shuffle_epi8(c_vec, mask);
+//     res_c = _mm_mul_pd((__m128d)c_vec, scalar_vec);
+//     __m128i d_vec = _mm_loadu_si128((__m128i*)(&a[i+6]));
+//     d_vec = _mm_shuffle_epi8(d_vec, mask);
+//     res_d = _mm_mul_pd((__m128d)d_vec, scalar_vec);
+//     // at this point there are 4 results of scaling 
+//     // each one needs to go through conversion then split and follow the pattern below
+//     // |48|48|32|  |16|48|48|16|  |32|48|48|
+//     //  0   1  2    2  3  4   5    5  6   7   << indexes of array elements
+//     
+//     // apply conversion
+//     // each item now is under the form of
+//     // |48|48|32-blank
+//     __m128i a = convert_double_to_f48_SSE((__m128i)res_a);
+//     __m128i b = convert_double_to_f48_SSE((__m128i)res_b);
+//     __m128i c = convert_double_to_f48_SSE((__m128i)res_c);
+//     __m128i d = convert_double_to_f48_SSE((__m128i)res_d);
+//     
+//     // _mm_or_si128
+//     mask = _mm_set_epi8(255, 255, 255, 255, 255, 255, 255, 255,
+//   			      255, 255, 255, 255, 15, 14, 13, 12);
+//     __m128i tmp = _mm_shuffle_epi8(b, mask);
+//     __m128i res_aa = _mm_or_si128(a, tmp);
+//     f48 testing;
+//     memcpy ((void*)a[i], (void*)res_aa, 6);
+//     double * temp = new double[size];
+//     _mm_store_pd(&temp[0], (__m128d)res_aa);    
+    
   }
-  // convert back to f48 and add to final result array
-  for(int i=0 ; i< size; i++){
-      result[i] = f48(temp[i]);
-  }
-  // return the result array
-  return result;
+
 }
 
 double * scale_double_vector_SSE (double * a, double scalar)
@@ -938,9 +1003,15 @@ int main()
 
   
 // int x;
-f48 a[2];
+f48 a[8];
  a[0] = f48(2);
  a[1] = f48(3);
+ a[2] = f48(1.7);
+ a[3] = f48(1.4);
+ a[4] = f48(3);
+ a[5] = f48(3);
+ a[6] = f48(3);
+ a[7] = f48(3);
 //  a[2] = f48(2.1);
 // a[3] = f48(7.1);
  double b[2];
@@ -974,10 +1045,10 @@ f48 a[2];
 //  test_magnitude_f48_SSE();
 //  test_magnitude_double_SSE();
 //  build_report_magnitude();
- 
- __m128i a_vec = _mm_loadu_si128((__m128i*)(&b[0]));
- __m128i result = convert_double_to_f48_SSE(a_vec);
- _mm_store_pd(&b[0],(__m128d)result);
 
-  return 0;
+ 
+ 
+ scale_f48_vector_SSE(a, f48(3));
+ 
+ return 0;
 }
