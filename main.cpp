@@ -326,8 +326,8 @@ __m128i convert_double_to_f48_SSE (__m128i a)
 	__m128d result = _mm_add_pd((__m128d)unrounded_result, (__m128d)r_or_s);
 	
 	// permute to left
-	__m128i permute_mask = _mm_set_epi8(15, 14, 13, 12, 11, 10, 7, 6,
-			    5, 4, 3, 2, 255, 255, 255, 255);
+	__m128i permute_mask = _mm_set_epi8(255,255,255,255,15, 14, 13, 12, 11, 10, 7, 6,
+			    5, 4, 3, 2);
 	
 	return (__m128i)_mm_shuffle_epi8((__m128i)result, permute_mask); // apply permutation mask
 // 	return (__m128i)result;
