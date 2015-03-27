@@ -370,6 +370,34 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a45_round = convert_double_to_f48_SSE((__m128i)res_a45);
     __m128i a67_round = convert_double_to_f48_SSE((__m128i)res_a67);
     
+        
+   // place them right for memory write 
+    __m128i match_mask = _mm_set_epi8(3,2,1,0,255,255,255,255,255,255,255,255,255,255,255,255); // mask used to match the missing spaces
+    __m128i a23_shuffled = _mm_shuffle_epi8((__m128i)a23_round, match_mask); // shuffle the positions required for the space in a01 for a2
+    a01_round = _mm_or_si128(a01_round,a23_shuffled);
+    
+    __m128d shift_count = _mm_set1_pd(32.0);
+    a23_round = _mm_srl_epi64(a23_round, (__m128i)shift_count); // shift a23 for the new placement
+    
+    match_mask = _mm_set_epi8(7,6,5,4,3,2,1,0,255,255,255,255,255,255,255,255); // reset the match mask for a4 and small bit of a5
+    __m128i a45_shuffled = _mm_shuffle_epi8((__m128i)a45_round, match_mask); // shuffle a45 to fit in a23
+    a23_round = _mm_or_si128(a23_round,a45_shuffled);
+    
+    shift_count = _mm_set1_pd(64.0);
+    a45_round = _mm_srl_epi64(a45_round, (__m128i)shift_count);
+    
+    match_mask = _mm_set_epi8(11,10,9,8,7,6,5,4,3,2,1,0,255,255,255,255);
+    __m128i a67_shuffled = _mm_shuffle_epi8((__m128i)a67_round, match_mask);
+    a45_round = _mm_or_si128(a45_round,a67_shuffled);
+    
+    
+    // WRITE BACK TO MEMORY
+    _mm_store_ps((float*)&a[i], (__m128)a01_round);    
+//     _mm_store_ps((float*)&a[i+2], (__m128)a23_round);        
+//     _mm_store_pd((double*)&a[i+4]+16, (__m128d)a45_round);    
+    cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<endl;
+    
+    
     _mm_store_pd((double*)&a[i], (__m128d)a01_round);    
     _mm_store_pd((double*)&a[i+2]+32, (__m128d)a23_round);
 //    _mm_store_pd((double*)&a[i+5]+16, (__m128d)a34_round); 
