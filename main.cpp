@@ -370,7 +370,9 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a45_round = convert_double_to_f48_SSE((__m128i)res_a45);
     __m128i a67_round = convert_double_to_f48_SSE((__m128i)res_a67);
     
-    _mm_store_pd((double*)&a[0], (__m128d)a01_round);    
+    _mm_store_pd((double*)&a[i], (__m128d)a01_round);    
+    _mm_store_pd((double*)&a[i+2]+32, (__m128d)a23_round);
+//    _mm_store_pd((double*)&a[i+5]+16, (__m128d)a34_round); 
     cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<endl;
     
     
