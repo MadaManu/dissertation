@@ -731,7 +731,7 @@ void test_f48_scale()
   u64 stop;
   u64 diff;
   ofstream myfile;
-  myfile.open ("results/scale_SSE_f48.txt");
+  myfile.open ("macneill_results/scale_SSE_f48.txt");
 
   for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
@@ -741,7 +741,7 @@ void test_f48_scale()
     myfile<<diff<<endl;
 //     cout << diff << ",";
   }
-  cout<<"Done. Results in results/scale_SSE_f48.txt "<<endl;
+  cout<<"Done. Results in macneill_results/scale_SSE_f48.txt "<<endl;
 }
 
 void test_double_scale()
@@ -757,7 +757,7 @@ void test_double_scale()
   u64 stop;
   u64 diff;
   ofstream myfile;
-  myfile.open ("results/scale_SSE_double.txt");
+  myfile.open ("macneill_results/scale_SSE_double.txt");
 
   for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
@@ -767,7 +767,7 @@ void test_double_scale()
     myfile<<diff<<endl;
 //     cout << diff << ",";
   }
-  cout<<"Done. Results in results/scale_SSE_double.txt "<<endl;
+  cout<<"Done. Results in macneill_results/scale_SSE_double.txt "<<endl;
 //   cout<<endl;
 }
 
@@ -964,13 +964,13 @@ void build_report_scaling()
 {
   cout<<"Compiling results in main scaling report..."<<endl;
   ofstream myfile;
-  myfile.open ("results/scale_report.txt");
+  myfile.open ("macneill_results/scale_report.txt");
   myfile<<"Scale test (f48 vs double)"<<endl;
   myfile<<"SSE f48, SSE double"<<endl;
   
   string results[100]; // TODO: use the test results number from global here!
   string line;
-  ifstream scale_f48 ("results/scale_SSE_double.txt");
+  ifstream scale_f48 ("macneill_results/scale_SSE_double.txt");
   int i=0;
   if (scale_f48.is_open())
   {
@@ -982,7 +982,7 @@ void build_report_scaling()
     scale_f48.close();
   }
   
-  ifstream scale_double ("results/scale_SSE_f48.txt");
+  ifstream scale_double ("macneill_results/scale_SSE_f48.txt");
   i=0;
   if (scale_double.is_open())
   {
@@ -998,7 +998,7 @@ void build_report_scaling()
 
   
   myfile.close();
-  cout<<"Scale results compiled for f48 and double. (results/scale_report.txt)"<<endl;
+  cout<<"Scale results compiled for f48 and double. (macneill_results/scale_report.txt)"<<endl;
 }
 
 // TODO: add number of runs for test results global
