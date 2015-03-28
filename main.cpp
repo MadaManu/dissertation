@@ -727,7 +727,6 @@ void test_f48_scale()
   f48 scalar = f48(rand() % 1024);
 
   u64 start;
-  f48 * scaled_res;
   u64 stop;
   u64 diff;
   ofstream myfile;
@@ -735,7 +734,7 @@ void test_f48_scale()
 
   for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
-    scaled_res = scale_f48_vector_SSE(a, scalar);
+    scale_f48_vector_SSE(a, scalar);
     stop = rdtsc();
     diff = stop - start;
     myfile<<diff<<endl;
