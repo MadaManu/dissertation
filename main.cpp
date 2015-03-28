@@ -310,16 +310,18 @@ __m128i convert_double_to_f48_SSE (__m128i a)
 	__m128i mask = _mm_set_epi8(15,14,13,12,11,10,255, 255,
 			    7, 6, 5, 4, 3, 2, 255, 255);
 	__m128i unrounded_result = _mm_shuffle_epi8(a, mask);
-
+	
 	__m128d s_mask = _mm_set_pd(1.61890490173e-319,1.61890490173e-319);  // 0000000000000000000000000000000000000000000000000111111111111111
 							     // 0x7fff ^^ - to be added for S
 	__m128i s = _mm_and_si128(a, (__m128i)s_mask); // remove all the other stuff before S and extract S bits (last bits after R being removed)
 	s = (__m128i)_mm_add_pd((__m128d)s, (__m128d)s_mask); // add 0x7fff to obtain S in overflow at position of R
+	
 	__m128d r_mask = _mm_set_pd(8.09477154146e-320,8.09477154146e-320); // 0000000000000000000000000000000000000000000000000100000000000000
 							      // 0x4000 && - to be used to select R
 	__m128i r = _mm_and_si128(a, (__m128i)r_mask); // select the R bit
-	__m128i r_or_s = _mm_or_si128(s,r);  // R|S in the position of R
 	
+	__m128i r_or_s = _mm_or_si128(s,r);  // R|S in the position of R
+		
 	__m128d shift_count = _mm_set1_pd(1.0);
 	r_or_s = _mm_sll_epi64(r_or_s, (__m128i)shift_count); // shift R|S to left by 1 to match the position of G
 	
@@ -391,23 +393,27 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
     a45_round = _mm_or_si128(a45_round,a67_shuffled);
     
     
+#define bofs(base,ofs) ( (double*)((ofs)+(char*)(base)) )
+
+// _mm_storeu_pd( bofs(a,4), (__m128d)a45_round );
+    
     // WRITE BACK TO MEMORY
-    _mm_store_ps((float*)&a[i], (__m128)a01_round);    
-//     _mm_store_ps((float*)&a[i+2], (__m128)a23_round);        
-//     _mm_store_pd((double*)&a[i+4]+16, (__m128d)a45_round);    
-    cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<endl;
+    _mm_storeu_pd(bofs(&a[i],0), (__m128d)a01_round);    
+    _mm_storeu_pd(bofs(&a[i+2],0), (__m128d)a23_round);        
+    _mm_storeu_pd(bofs(&a[i+4],6), (__m128d)a45_round);    
+    cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<" "<<a[4]<<" "<<a[5]<<" "<<a[6]<<" "<<a[7]<<endl;
+//       double *p = (double*)&a[i];
+//       _mm_storeu_pd(p+0, (__m128d)a01_round);
+//       _mm_storeu_pd(p+2, (__m128d)a23_round);
+//       _mm_storeu_pd(p+4, (__m128d)a45_round); 
     
-    
-    _mm_store_pd((double*)&a[i], (__m128d)a01_round);    
-    _mm_store_pd((double*)&a[i+2]+32, (__m128d)a23_round);
-//    _mm_store_pd((double*)&a[i+5]+16, (__m128d)a34_round); 
-    cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<endl;
+//     cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<" "<<a[4]<<" "<<a[5]<<" "<<a[6]<<" "<<a[7]<<endl;
     
     
     // TEST
-    double * result = new double[2]; // should be size
-    _mm_store_pd(&result[0], (__m128d)a01_round);
-    cout<<result[0]<<" "<<result[1]<<endl;
+//     double * result = new double[2]; // should be size
+//     _mm_store_pd(&result[0], (__m128d)a01_round);
+//     cout<<result[0]<<" "<<result[1]<<endl;
 //     _mm_store_pd(&result[0], (__m128d)res_a23);
 //     cout<<result[0]<<" "<<result[1]<<endl;
     
@@ -1034,14 +1040,14 @@ int main()
   
 // int x;
 f48 a[8];
- a[0] = f48(2);
- a[1] = f48(3);
+ a[0] = f48(2.0);
+ a[1] = f48(3.0);
  a[2] = f48(1.7);
  a[3] = f48(1.4);
- a[4] = f48(3);
- a[5] = f48(3);
- a[6] = f48(3);
- a[7] = f48(3);
+ a[4] = f48(3.0);
+ a[5] = f48(3.0);
+ a[6] = f48(3.0);
+ a[7] = f48(3.0);
 //  a[2] = f48(2.1);
 // a[3] = f48(7.1);
  double b[2];
