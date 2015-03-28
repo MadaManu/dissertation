@@ -669,6 +669,113 @@ double magnitude_SSE_double (double *a){
   return res;
 }
 
+// TODO: implement same using f48 maybe to compare some timmings
+// TODO: function to take size
+// TODO: implement in SSE
+// function is void as should overwrite the input
+// works for square matrix - ?? does it require to work for not square matrix?
+// ^^ for non-square matrix requires computation of final size of vector
+// matrix * vector always returns vector (size is dependant on the matrix size
+void matrix_vector_mul_double(double** mat, double* vec)
+{
+  for(unsigned i=0;i<3;i++) { // row
+    double running_sum = 0;
+    for(unsigned j=0;j<3;j++) { // col
+	running_sum += mat[i][j]*vec[i];
+    }
+    vec[i] = running_sum;
+  }
+}
+
+void matrix_vector_mul_f48(f48** mat, f48* vec) 
+{
+  
+}
+
+// TODO: function to take size
+// TODO: requires implementation
+// matrix is square?
+// same questions as above
+void matrix_vector_mul_SSE_double(double** mat, double* vec)
+{
+  for(unsigned i=0;i<4;i++) { // row
+    __m128d running_sum = _mm_set1_pd(0.0); // running sum initially 0
+    for(unsigned j=0;j<4;j+=2) { // col - requires skipping on 2 at a time
+      // load 2 elements of matrix
+      // load 1 element of vector in 2 places of __m128d
+      // multiply each
+      // add to running sum
+      __m128d mat_vect = _mm_load_pd(&mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
+						  // ^^ needs explanation and backup for REPORT TODO
+      __m128d vec_elem = _mm_load1_pd(&vec[i]);
+      __m128d mult = _mm_mul_pd(mat_vect,vec_elem);
+      running_sum = _mm_add_pd(mult,running_sum);
+    
+      
+    }
+    // shuffle & add (to make hadd)
+    // store back to vec[i]
+    __m128i mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+    __m128i sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum, mask);
+    running_sum = _mm_add_pd(running_sum,(__m128d)sum_shuffled);
+    double test;
+    _mm_store1_pd(&test, running_sum);
+    vec[i] = test; // a work around to make storing back to vector not cause a seg fault - needs investigation TODO
+//     _mm_store1_pd(&vec[i],running_sum); // this results in seg fault - have no idea why
+    
+  }
+}
+
+// v2 is taking 4 at a time 
+//
+//    mat        vec
+// |a|b|c|d|     |W|
+// |e|f|g|h|     |X|
+// |i|j|k|l|     |Y|
+// |m|n|o|p|     |Z|
+// 
+// Function computes: 
+// a*W+b*W+c*W+d*W | e*X+f*X+g*X+h*X and stores them @ &vec[0] (storing first result in vec[0] & second result in vec[1]
+// i*Y+j*Y+k*Y+l*Y | m*Z+n*Z+o*Z+p*Z and stores them @ &vec[2] (storing first result in vec[2] & second result in vec[3]
+// 
+//
+void matrix_vector_mul_SSE_double_v2(double** mat, double* vec)
+{
+  for(unsigned i=0;i<4;i+=2) { // row // requiring 2 at a time
+    __m128d running_sum1 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum2 = _mm_set1_pd(0.0); // running sum initially 0
+    for(unsigned j=0;j<4;j+=2) { // col - requires skipping on 2 at a time
+       __m128d mat_vect = _mm_load_pd(&mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
+						  // ^^ needs explanation and backup for REPORT TODO
+      __m128d vec_elem = _mm_load1_pd(&vec[i]);
+      __m128d mult = _mm_mul_pd(mat_vect,vec_elem);
+      running_sum1 = _mm_add_pd(mult,running_sum1);
+      
+       mat_vect = _mm_load_pd(&mat[i+1][j]); // hoping that addresses are as expected - seems like this is the way it's stored
+						  // ^^ needs explanation and backup for REPORT TODO
+      vec_elem = _mm_load1_pd(&vec[i+1]);
+      mult = _mm_mul_pd(mat_vect,vec_elem);
+      running_sum2 = _mm_add_pd(mult,running_sum2);
+    }
+    __m128i mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+    __m128i sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum1, mask);
+    running_sum1 = _mm_add_pd(running_sum1,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum2, mask);
+    running_sum2 = _mm_add_pd(running_sum2,(__m128d)sum_shuffled);
+    mask = _mm_set_epi8(255, 255, 255, 255, 255, 255, 255, 255,
+			7 ,6 ,5, 4, 3, 2, 1, 0);
+    running_sum1 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum1, mask);
+    mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+			255, 255, 255, 255, 255, 255, 255, 255);
+    running_sum2 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum2, mask);
+    running_sum1 = (__m128d)_mm_or_si128((__m128i)running_sum1,(__m128i)running_sum2);
+    _mm_store_pd(&vec[i], running_sum1);
+  }
+}
+
+
 void test_f48_dot_prod()
 {
   cout<<"f48 dot product" << endl;
@@ -1071,9 +1178,91 @@ f48 a[8];
 
  
  
- test_f48_scale();
- test_double_scale();
- build_report_scaling();
+//  test_f48_scale();
+//  test_double_scale();
+//  build_report_scaling();
+ 
+ 
+ double** matrix = new double*[4];
+for(int i = 0; i < 4; ++i){
+    matrix[i] = new double[4];
+}
+
+for(unsigned i=0;i<4;i++) {
+    for(unsigned j=0;j<4;j++) {
+        cout<<"Enter the"<<i+1<<"*"<<j+1<<"entry";
+        cin>>matrix[i][j];
+    }
+}
+
+
+for(unsigned i=0;i<4;i++) {
+    for(unsigned j=0;j<4;j++) {
+        cout<<matrix[i][j]<<"\t";
+    }
+    cout<<endl;
+}
+
+double* vector = new double[4];
+for(unsigned i=0;i<4;i++){
+  vector[i] = i;
+}
+for(unsigned i=0;i<4;i++){
+  cout << vector[i]<<endl;
+}
+
+u64 start;
+u64 stop;
+u64 v1;
+u64 v2;
+u64 v2v1;
+// matrix_vector_mul_double(matrix,vector);
+
+start = rdtsc();
+matrix_vector_mul_SSE_double(matrix,vector);
+stop = rdtsc();
+v1 = stop-start;
+
+for(unsigned i=0;i<4;i++){
+  cout << vector[i]<<endl;
+}
+
+start = rdtsc();
+matrix_vector_mul_SSE_double_v2(matrix,vector);
+stop = rdtsc();
+v2 = stop-start;
+
+for(unsigned i=0;i<4;i++){
+  cout << vector[i]<<endl;
+}
+
+cout<<"V1: "<<v1<<endl;
+cout<<"V2: "<<v2<<endl;
+cout<<"V2-V1: "<<v2-v1<<endl;
+
+int test;
+cin>>test;
+
+// matrix_vector_mul_SSE_double testing versions - on small scale 4*4 with 4 vector
+// V1: 6916  | V1: 6992  | V1: 7000
+// V2: 72    | V2: 60    | V2: 60
+// TODO: test on bigger sizes such as 1024*1024 x 1024*1024 with 1024 vec & see results of timmings between v1 & v2
+// TODO: maybe add hadd in v3 just for comparison
+// 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
  
  return 0;
 }
