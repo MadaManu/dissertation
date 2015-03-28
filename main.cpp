@@ -335,7 +335,7 @@ __m128i convert_double_to_f48_SSE (__m128i a)
 // 	return (__m128i)result;
 }
 
-f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
+void scale_f48_vector_SSE (f48 * a, f48 scalar)
 {
    double double_scalar = (double)scalar;
   __m128d scalar_vec = _mm_load1_pd(&double_scalar);
@@ -344,7 +344,7 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
   			      5, 4, 3, 2, 1, 0, 255, 255);
   
    
-  for ( int i = 0; i < 8; i+=8 ) { // should be size
+  for ( int i = 0; i < size; i+=8 ) { // should be size
     
     // try loading all in 3 SSE items, then shuffle them into 4 128 items and then do the scale and then the conversion and reshuffling in place and storing!!!
     // this will give another set of results for comparison of the methods with the benchmark being the double version
@@ -394,85 +394,28 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a67_shuffled = _mm_shuffle_epi8((__m128i)a67_round, match_mask);
     a45_round = _mm_or_si128(a45_round,a67_shuffled);
     
-    
-// #define bofs(base,ofs) ( (double*)((ofs)+(char*)(base)) )
-#define bofs(base, ofs) (((double*)(base))+ofs)
+    #define bofs(base, ofs) (((double*)(base))+ofs)
 
     // WRITE BACK TO MEMORY
     _mm_storeu_pd(bofs(&a[i],0), (__m128d)a01_round);    
     _mm_storeu_pd(bofs(&a[i],2), (__m128d)a23_round);        
     _mm_storeu_pd(bofs(&a[i],4), (__m128d)a45_round);    
-    cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<" "<<a[4]<<" "<<a[5]<<" "<<a[6]<<" "<<a[7]<<endl;
    
-//     double * result = new double[2]; // should be size
-//     _mm_store_pd(&result[0], (__m128d)a01_round);
-//     cout<<result[0]<<" "<<result[1]<<endl;
-    
-    
-    
-    // TEST
-//     double * result = new double[2]; // should be size
-//     _mm_store_pd(&result[0], (__m128d)a01_round);
-//     cout<<result[0]<<" "<<result[1]<<endl;
-//     _mm_store_pd(&result[0], (__m128d)res_a23);
-//     cout<<result[0]<<" "<<result[1]<<endl;
-    
-    // place them right for memory write
-    
-    
-    
-//     __m128i a01 = _mm_loadu_si128((__m128i*)(&a[i]));
-//     a01 = _mm_shuffle_epi8(a01, mask);
-//     res_a = _mm_mul_pd((__m128d)a01, scalar_vec);
-//     __m128i b_vec = _mm_loadu_si128((__m128i*)(&a[i+2]));
-//     b_vec = _mm_shuffle_epi8(b_vec, mask);
-//     res_b = _mm_mul_pd((__m128d)b_vec, scalar_vec);
-//     __m128i c_vec = _mm_loadu_si128((__m128i*)(&a[i+4]));
-//     c_vec = _mm_shuffle_epi8(c_vec, mask);
-//     res_c = _mm_mul_pd((__m128d)c_vec, scalar_vec);
-//     __m128i d_vec = _mm_loadu_si128((__m128i*)(&a[i+6]));
-//     d_vec = _mm_shuffle_epi8(d_vec, mask);
-//     res_d = _mm_mul_pd((__m128d)d_vec, scalar_vec);
-//     // at this point there are 4 results of scaling 
-//     // each one needs to go through conversion then split and follow the pattern below
-//     // |48|48|32|  |16|48|48|16|  |32|48|48|
-//     //  0   1  2    2  3  4   5    5  6   7   << indexes of array elements
-//     
-//     // apply conversion
-//     // each item now is under the form of
-//     // |48|48|32-blank
-//     __m128i a = convert_double_to_f48_SSE((__m128i)res_a);
-//     __m128i b = convert_double_to_f48_SSE((__m128i)res_b);
-//     __m128i c = convert_double_to_f48_SSE((__m128i)res_c);
-//     __m128i d = convert_double_to_f48_SSE((__m128i)res_d);
-//     
-//     // _mm_or_si128
-//     mask = _mm_set_epi8(255, 255, 255, 255, 255, 255, 255, 255,
-//   			      255, 255, 255, 255, 15, 14, 13, 12);
-//     __m128i tmp = _mm_shuffle_epi8(b, mask);
-//     __m128i res_aa = _mm_or_si128(a, tmp);
-//     f48 testing;
-//     memcpy ((void*)a[i], (void*)res_aa, 6);
-//     double * temp = new double[size];
-//     _mm_store_pd(&temp[0], (__m128d)res_aa);    
     
   }
 
 }
 
-double * scale_double_vector_SSE (double * a, double scalar)
+void scale_double_vector_SSE (double * a, double scalar)
 {
-  double * result = new double[size]; // should be size
   __m128d scalar_vec = _mm_load1_pd(&scalar);
   __m128d result_vec = _mm_set1_pd(0.0);
   
   for (int i=0; i<size; i+=2) { // should be size
     __m128d a_vec = _mm_load_pd(&a[i]);
     result_vec = _mm_mul_pd(a_vec, scalar_vec);
-    _mm_store_pd(&result[i], result_vec);
+    _mm_store_pd(&a[i], result_vec);
   }
-//   cout<<result[0]<<' '<<result[1];
-  return result;
 }
 
 
@@ -777,8 +720,7 @@ void test_double_dot_prod()
 
 void test_f48_scale()
 {
-  cout<<"f48 scale vector " << endl;
-  cout<<"RDTSC diff" << endl;
+  cout<<"f48 scaling SSE..." << endl;
   f48 * a = new f48[size];
   populate_array(a);
   srand(5);
@@ -788,22 +730,23 @@ void test_f48_scale()
   f48 * scaled_res;
   u64 stop;
   u64 diff;
+  ofstream myfile;
+  myfile.open ("results/scale_SSE_f48.txt");
 
-  for ( int i = 0; i < 1; i++ ) {
+  for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
     scaled_res = scale_f48_vector_SSE(a, scalar);
     stop = rdtsc();
     diff = stop - start;
-
-    cout << diff << ",";
+    myfile<<diff<<endl;
+//     cout << diff << ",";
   }
-  cout<<endl;
+  cout<<"Done. Results in results/scale_SSE_f48.txt "<<endl;
 }
 
 void test_double_scale()
 {
-  cout<<"DOUBLE scale vector" << endl;
-  cout<<"RDTSC diff" << endl;
+  cout<<"double scaling SSE..." << endl;
   double * a = new double[size];
   srand(5);
   double scalar = rand() % 1024;
@@ -811,18 +754,21 @@ void test_double_scale()
   populate_array(a);
 
   u64 start;
-  double * scale_res;
   u64 stop;
   u64 diff;
+  ofstream myfile;
+  myfile.open ("results/scale_SSE_double.txt");
 
   for ( int i = 0; i < 100; i++ ) {
     start = rdtsc();
-    scale_res = scale_double_vector_SSE(a, scalar);
+    scale_double_vector_SSE(a, scalar);
     stop = rdtsc();
     diff = stop - start;
-    cout << diff << ",";
+    myfile<<diff<<endl;
+//     cout << diff << ",";
   }
-  cout<<endl;
+  cout<<"Done. Results in results/scale_SSE_double.txt "<<endl;
+//   cout<<endl;
 }
 
 void test_max_f48_SSE()
@@ -1013,6 +959,48 @@ void build_report_magnitude()
   cout<<"Magnitude results compiled for f48 and double. (results/magnitude_report.txt)"<<endl;
 }
 
+
+void build_report_scaling() 
+{
+  cout<<"Compiling results in main scaling report..."<<endl;
+  ofstream myfile;
+  myfile.open ("results/scale_report.txt");
+  myfile<<"Scale test (f48 vs double)"<<endl;
+  myfile<<"SSE f48, SSE double"<<endl;
+  
+  string results[100]; // TODO: use the test results number from global here!
+  string line;
+  ifstream scale_f48 ("results/scale_SSE_double.txt");
+  int i=0;
+  if (scale_f48.is_open())
+  {
+    while ( getline (scale_f48,line) )
+    {
+      results[i] = line;
+      i++;
+    }
+    scale_f48.close();
+  }
+  
+  ifstream scale_double ("results/scale_SSE_f48.txt");
+  i=0;
+  if (scale_double.is_open())
+  {
+    while ( getline (scale_double,line) )
+    {
+      myfile<<results[i]<<","<<line<<endl;
+      i++;
+    }
+    scale_double.close();
+  }
+
+  else cout << "Unable to open file"; 
+
+  
+  myfile.close();
+  cout<<"Scale results compiled for f48 and double. (results/scale_report.txt)"<<endl;
+}
+
 // TODO: add number of runs for test results global
 /************* MAIN ***********************/
 int main()
@@ -1084,7 +1072,9 @@ f48 a[8];
 
  
  
- scale_f48_vector_SSE(a, f48(1.88));
+ test_f48_scale();
+ test_double_scale();
+ build_report_scaling();
  
  return 0;
 }
