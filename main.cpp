@@ -345,6 +345,10 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
   
    
   for ( int i = 0; i < 8; i+=8 ) { // should be size
+    
+    // try loading all in 3 SSE items, then shuffle them into 4 128 items and then do the scale and then the conversion and reshuffling in place and storing!!!
+    // this will give another set of results for comparison of the methods with the benchmark being the double version
+    
     // ^^ for loop unrolling to work need to loop around 8 elements
     __m128i a01 = _mm_loadu_si128((__m128i*)(&a[i])); // load a[0] and a[1]
     a01 = _mm_shuffle_epi8(a01, mask);
@@ -378,36 +382,32 @@ f48 * scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a23_shuffled = _mm_shuffle_epi8((__m128i)a23_round, match_mask); // shuffle the positions required for the space in a01 for a2
     a01_round = _mm_or_si128(a01_round,a23_shuffled);
     
-    __m128d shift_count = _mm_set1_pd(32.0);
-    a23_round = _mm_srl_epi64(a23_round, (__m128i)shift_count); // shift a23 for the new placement
+    a23_round = _mm_srli_si128 (a23_round, 4); // using _mm_srli_si128 instead of _mm_sll_epi64 because the epi64 shitfs witin each double element in the 128 item
     
     match_mask = _mm_set_epi8(7,6,5,4,3,2,1,0,255,255,255,255,255,255,255,255); // reset the match mask for a4 and small bit of a5
     __m128i a45_shuffled = _mm_shuffle_epi8((__m128i)a45_round, match_mask); // shuffle a45 to fit in a23
     a23_round = _mm_or_si128(a23_round,a45_shuffled);
     
-    shift_count = _mm_set1_pd(64.0);
-    a45_round = _mm_srl_epi64(a45_round, (__m128i)shift_count);
+    a45_round = _mm_srli_si128(a45_round, 8); // using _mm_srli_si128 instead of _mm_sll_epi64 because the epi64 shitfs witin each double element in the 128 item
     
     match_mask = _mm_set_epi8(11,10,9,8,7,6,5,4,3,2,1,0,255,255,255,255);
     __m128i a67_shuffled = _mm_shuffle_epi8((__m128i)a67_round, match_mask);
     a45_round = _mm_or_si128(a45_round,a67_shuffled);
     
     
-#define bofs(base,ofs) ( (double*)((ofs)+(char*)(base)) )
+// #define bofs(base,ofs) ( (double*)((ofs)+(char*)(base)) )
+#define bofs(base, ofs) (((double*)(base))+ofs)
 
-// _mm_storeu_pd( bofs(a,4), (__m128d)a45_round );
-    
     // WRITE BACK TO MEMORY
     _mm_storeu_pd(bofs(&a[i],0), (__m128d)a01_round);    
-    _mm_storeu_pd(bofs(&a[i+2],0), (__m128d)a23_round);        
-    _mm_storeu_pd(bofs(&a[i+4],6), (__m128d)a45_round);    
+    _mm_storeu_pd(bofs(&a[i],2), (__m128d)a23_round);        
+    _mm_storeu_pd(bofs(&a[i],4), (__m128d)a45_round);    
     cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<" "<<a[4]<<" "<<a[5]<<" "<<a[6]<<" "<<a[7]<<endl;
-//       double *p = (double*)&a[i];
-//       _mm_storeu_pd(p+0, (__m128d)a01_round);
-//       _mm_storeu_pd(p+2, (__m128d)a23_round);
-//       _mm_storeu_pd(p+4, (__m128d)a45_round); 
+   
+//     double * result = new double[2]; // should be size
+//     _mm_store_pd(&result[0], (__m128d)a01_round);
+//     cout<<result[0]<<" "<<result[1]<<endl;
     
-//     cout<<a[0]<<" "<<a[1]<<" "<<a[2]<<" "<<a[3]<<" "<<a[4]<<" "<<a[5]<<" "<<a[6]<<" "<<a[7]<<endl;
     
     
     // TEST
@@ -1040,14 +1040,14 @@ int main()
   
 // int x;
 f48 a[8];
- a[0] = f48(2.0);
- a[1] = f48(3.0);
- a[2] = f48(1.7);
+ a[0] = f48(1.5);
+ a[1] = f48(64.9);
+ a[2] = f48(12.8);
  a[3] = f48(1.4);
- a[4] = f48(3.0);
- a[5] = f48(3.0);
- a[6] = f48(3.0);
- a[7] = f48(3.0);
+ a[4] = f48(3.2);
+ a[5] = f48(2.1);
+ a[6] = f48(1.89);
+ a[7] = f48(1.3);
 //  a[2] = f48(2.1);
 // a[3] = f48(7.1);
  double b[2];
@@ -1084,7 +1084,7 @@ f48 a[8];
 
  
  
- scale_f48_vector_SSE(a, f48(3));
+ scale_f48_vector_SSE(a, f48(1.88));
  
  return 0;
 }
