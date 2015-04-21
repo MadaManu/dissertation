@@ -681,7 +681,7 @@ void matrix_vector_mul_double(double** mat, double* vec)
   for(unsigned i=0;i<3;i++) { // row
     double running_sum = 0;
     for(unsigned j=0;j<3;j++) { // col
-	running_sum += mat[i][j]*vec[i];
+	running_sum += mat[i][j]*vec[j];
     }
     vec[i] = running_sum;
   }
@@ -696,8 +696,9 @@ void matrix_vector_mul_f48(f48** mat, f48* vec)
 // TODO: requires implementation
 // matrix is square?
 // same questions as above
-void matrix_vector_mul_SSE_double(double** mat, double* vec)
+void matrix_vector_mul_SSE_double(double** mat, double* &vec)
 {
+  double* result = new double[4]; // should be size of result!
   for(unsigned i=0;i<4;i++) { // row
     __m128d running_sum = _mm_set1_pd(0.0); // running sum initially 0
     for(unsigned j=0;j<4;j+=2) { // col - requires skipping on 2 at a time
@@ -707,7 +708,7 @@ void matrix_vector_mul_SSE_double(double** mat, double* vec)
       // add to running sum
       __m128d mat_vect = _mm_load_pd(&mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
 						  // ^^ needs explanation and backup for REPORT TODO
-      __m128d vec_elem = _mm_load1_pd(&vec[i]);
+      __m128d vec_elem = _mm_load_pd(&vec[j]);
       __m128d mult = _mm_mul_pd(mat_vect,vec_elem);
       running_sum = _mm_add_pd(mult,running_sum);
     
@@ -721,10 +722,9 @@ void matrix_vector_mul_SSE_double(double** mat, double* vec)
     running_sum = _mm_add_pd(running_sum,(__m128d)sum_shuffled);
     double test;
     _mm_store1_pd(&test, running_sum);
-    vec[i] = test; // a work around to make storing back to vector not cause a seg fault - needs investigation TODO
-//     _mm_store1_pd(&vec[i],running_sum); // this results in seg fault - have no idea why
-    
+    result[i] = test; // a work around to make storing back to vector not cause a seg fault - needs investigation TODO    
   }
+  vec = result;
 }
 
 // v2 is taking 4 at a time 
@@ -740,21 +740,22 @@ void matrix_vector_mul_SSE_double(double** mat, double* vec)
 // i*Y+j*Y+k*Y+l*Y | m*Z+n*Z+o*Z+p*Z and stores them @ &vec[2] (storing first result in vec[2] & second result in vec[3]
 // 
 //
-void matrix_vector_mul_SSE_double_v2(double** mat, double* vec)
+void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
 {
+  double* result = new double[4];
   for(unsigned i=0;i<4;i+=2) { // row // requiring 2 at a time
     __m128d running_sum1 = _mm_set1_pd(0.0); // running sum initially 0
     __m128d running_sum2 = _mm_set1_pd(0.0); // running sum initially 0
     for(unsigned j=0;j<4;j+=2) { // col - requires skipping on 2 at a time
        __m128d mat_vect = _mm_load_pd(&mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
 						  // ^^ needs explanation and backup for REPORT TODO
-      __m128d vec_elem = _mm_load1_pd(&vec[i]);
+      __m128d vec_elem = _mm_load_pd(&vec[j]);
       __m128d mult = _mm_mul_pd(mat_vect,vec_elem);
       running_sum1 = _mm_add_pd(mult,running_sum1);
       
        mat_vect = _mm_load_pd(&mat[i+1][j]); // hoping that addresses are as expected - seems like this is the way it's stored
 						  // ^^ needs explanation and backup for REPORT TODO
-      vec_elem = _mm_load1_pd(&vec[i+1]);
+      vec_elem = _mm_load_pd(&vec[j]);
       mult = _mm_mul_pd(mat_vect,vec_elem);
       running_sum2 = _mm_add_pd(mult,running_sum2);
     }
@@ -771,8 +772,9 @@ void matrix_vector_mul_SSE_double_v2(double** mat, double* vec)
 			255, 255, 255, 255, 255, 255, 255, 255);
     running_sum2 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum2, mask);
     running_sum1 = (__m128d)_mm_or_si128((__m128i)running_sum1,(__m128i)running_sum2);
-    _mm_store_pd(&vec[i], running_sum1);
+    _mm_store_pd(&result[i], running_sum1);
   }
+  vec = result;
 }
 
 
@@ -1219,7 +1221,7 @@ u64 v2v1;
 // matrix_vector_mul_double(matrix,vector);
 
 start = rdtsc();
-matrix_vector_mul_SSE_double(matrix,vector);
+matrix_vector_mul_SSE_double_v2(matrix,vector);
 stop = rdtsc();
 v1 = stop-start;
 
@@ -1227,18 +1229,18 @@ for(unsigned i=0;i<4;i++){
   cout << vector[i]<<endl;
 }
 
-start = rdtsc();
-matrix_vector_mul_SSE_double_v2(matrix,vector);
-stop = rdtsc();
-v2 = stop-start;
+// start = rdtsc();
+// matrix_vector_mul_SSE_double_v2(matrix,vector);
+// stop = rdtsc();
+// v2 = stop-start;
 
-for(unsigned i=0;i<4;i++){
-  cout << vector[i]<<endl;
-}
-
+// for(unsigned i=0;i<4;i++){
+//   cout << vector[i]<<endl;
+// }
+/*
 cout<<"V1: "<<v1<<endl;
 cout<<"V2: "<<v2<<endl;
-cout<<"V2-V1: "<<v2-v1<<endl;
+cout<<"V2-V1: "<<v2-v1<<endl;*/
 
 int test;
 cin>>test;
