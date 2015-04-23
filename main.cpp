@@ -2,6 +2,7 @@
 #include <cmath>
 #include <ctime>
 #include <cstdlib> 
+#include <stdlib.h>
 #include <string>
 #include <x86intrin.h>
 #include <stdio.h>
@@ -14,6 +15,7 @@
 using namespace std;
 
 const int size = 1024;
+const int runs = 100;
 
 typedef unsigned long long u64;
 typedef unsigned short u16;
@@ -752,43 +754,35 @@ void matrix_vector_mul_SSE_double(double** mat, double* &vec)
 // f48 V1
 void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
 {
-  f48* result = new f48[4]; // should be size of result!
-  for(unsigned i=0;i<4;i++) { // row
+  f48* result = new f48[size]; // should be size of result!
+  __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+  			      5, 4, 3, 2, 1, 0, 255, 255);
+  __m128i shuffling_mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+			      15, 14, 13, 12, 11, 10, 9, 8);
+  for(unsigned i=0;i<size;i++) { // row
     __m128d running_sum = _mm_set1_pd(0.0); // running sum initially 0
-    for(unsigned j=0;j<4;j+=2) { // col - requires skipping on 2 at a time
+    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
 
       // multiply each
       // add to running sum
-      __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
-  			      5, 4, 3, 2, 1, 0, 255, 255);
-      __m128i mat_vect = _mm_loadu_si128((__m128i*) &vec[j]); // hoping that addresses are as expected - seems like this is the way it's stored
+      __m128i mat_vect = _mm_loadu_si128((__m128i*) &mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
 						  // ^^ needs explanation and backup for REPORT - ROW major storing order in C/C++ such as python, pascal and others
-      mat_vect = _mm_shuffle_epi8(mat_vect, mask);
-      _mm_storeu_pd((double*)&result[0],(__m128d)mat_vect);
-      cout<<i<<","<<j<<endl;
-      cout<<"RESULT "<<result[0]<<", "<<result[1]<<endl;
-//        double vec_item = (double)vec[j];
-       
-//       __m128d vec_elem = _mm_load1_pd(&vec_item);
-      
-//       __m128d mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
-//       running_sum = _mm_add_pd(mult,running_sum);
+      mat_vect = _mm_shuffle_epi8(mat_vect, mask);     
+      __m128i vec_elem = _mm_loadu_si128((__m128i*) &vec[j]);
+      vec_elem = _mm_shuffle_epi8(vec_elem, mask);
+
+      __m128d mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum = _mm_add_pd(mult,running_sum);
     
       
     }
     // shuffle & add (to make hadd)
     // store back to vec[i]
-//     __m128i mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
-// 		      15, 14, 13, 12, 11, 10, 9, 8);
-//     __m128i sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum, mask);
-//     running_sum = _mm_add_pd(running_sum,(__m128d)sum_shuffled);
-//     convert_double_to_f48_SSE((__m128i)running_sum);
-//     _mm_storeu_pd((double*)&result[i],running_sum);
-//     cout<<"RESULT"<<i<<":"<<result[i];
-//     _mm_store1_pd(&res, result_vec);
-//     double test;
-//     _mm_store_pd(&test, running_sum);
-//     result[i] = f48(test);
+    __m128i sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum, shuffling_mask);
+    running_sum = _mm_add_pd(running_sum,(__m128d)sum_shuffled);
+    double temp=0;
+    _mm_store1_pd(&temp, running_sum);
+    result[i]=f48(temp);
   }
   vec = result;
 }
@@ -801,7 +795,7 @@ void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
 // |i|j|k|l|     |Y|
 // |m|n|o|p|     |Z|
 // 
-// Function computes: 
+// Function computes: - WRONG - requires UPDATE!
 // a*W+b*W+c*W+d*W | e*X+f*X+g*X+h*X and stores them @ &vec[0] (storing first result in vec[0] & second result in vec[1]
 // i*Y+j*Y+k*Y+l*Y | m*Z+n*Z+o*Z+p*Z and stores them @ &vec[2] (storing first result in vec[2] & second result in vec[3]
 // 
@@ -821,7 +815,6 @@ void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
       
        mat_vect = _mm_load_pd(&mat[i+1][j]); // hoping that addresses are as expected - seems like this is the way it's stored
 						  // ^^ needs explanation and backup for REPORT TODO
-      vec_elem = _mm_load_pd(&vec[j]);
       mult = _mm_mul_pd(mat_vect,vec_elem);
       running_sum2 = _mm_add_pd(mult,running_sum2);
     }
@@ -831,6 +824,7 @@ void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
     running_sum1 = _mm_add_pd(running_sum1,(__m128d)sum_shuffled);
     sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum2, mask);
     running_sum2 = _mm_add_pd(running_sum2,(__m128d)sum_shuffled);
+    // shuffling so both results can be stored in one store instruction
     mask = _mm_set_epi8(255, 255, 255, 255, 255, 255, 255, 255,
 			7 ,6 ,5, 4, 3, 2, 1, 0);
     running_sum1 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum1, mask);
@@ -841,6 +835,182 @@ void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
     _mm_store_pd(&result[i], running_sum1);
   }
   vec = result;
+}
+
+void matrix_vector_mul_SSE_f48_v2(f48** mat, f48* &vec)
+{
+  f48* result = new f48[size];
+  __m128i load_mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+  			      5, 4, 3, 2, 1, 0, 255, 255);
+  for(unsigned i=0;i<size;i+=2) { // row // requiring 2 at a time
+    __m128d running_sum1 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum2 = _mm_set1_pd(0.0); // running sum initially 0
+    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
+      __m128i mat_vect = _mm_loadu_si128((__m128i*) &mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
+						  // ^^ needs explanation and backup for REPORT - ROW major storing order in C/C++ such as python, pascal and others
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      __m128i vec_elem = _mm_loadu_si128((__m128i*) &vec[j]);
+      vec_elem = _mm_shuffle_epi8(vec_elem, load_mask);
+      
+      __m128d mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum1 = _mm_add_pd(mult,running_sum1);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+1][j]); // hoping that addresses are as expected - seems like this is the way it's stored
+						  // ^^ needs explanation and backup for REPORT - ROW major storing order in C/C++ such as python, pascal and others
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum2 = _mm_add_pd(mult,running_sum2);
+    }
+    __m128i mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+    __m128i sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum1, mask);
+    running_sum1 = _mm_add_pd(running_sum1,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum2, mask);
+    running_sum2 = _mm_add_pd(running_sum2,(__m128d)sum_shuffled);
+    double temp = 0;
+    _mm_store1_pd((double*)&temp, running_sum2);
+    result[i] = f48(temp);
+    _mm_store1_pd((double*)&temp, running_sum2);
+    result[i+1] = f48(temp);
+  }
+  vec = result;
+}
+
+void matrix_vector_mul_SSE_f48_loop_unrolled (f48** mat, f48* &vec)
+{
+    // TESTING change size to min 8 - but multiple of 8
+    f48* result = new f48[size];
+  __m128i load_mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
+  			      5, 4, 3, 2, 1, 0, 255, 255);
+  for(unsigned i=0;i<size;i+=8) { // row // requiring 8 at a time - because loop un-roll
+    __m128d running_sum1 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum2 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum3 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum4 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum5 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum6 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum7 = _mm_set1_pd(0.0); // running sum initially 0
+    __m128d running_sum8 = _mm_set1_pd(0.0); // running sum initially 0
+    
+    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
+      __m128i mat_vect = _mm_loadu_si128((__m128i*) &mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      __m128i vec_elem = _mm_loadu_si128((__m128i*) &vec[j]);
+      vec_elem = _mm_shuffle_epi8(vec_elem, load_mask);
+      __m128d mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum1 = _mm_add_pd(mult,running_sum1);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+1][j]);
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum2 = _mm_add_pd(mult,running_sum2);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+2][j]);
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum3 = _mm_add_pd(mult,running_sum3);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+3][j]);
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum4 = _mm_add_pd(mult,running_sum4);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+4][j]);
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum5 = _mm_add_pd(mult,running_sum5);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+5][j]);
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum6 = _mm_add_pd(mult,running_sum6);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+6][j]);
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum7 = _mm_add_pd(mult,running_sum7);
+      
+      mat_vect = _mm_loadu_si128((__m128i*) &mat[i+7][j]);
+      mat_vect = _mm_shuffle_epi8(mat_vect, load_mask); 
+      mult = _mm_mul_pd((__m128d)mat_vect,(__m128d)vec_elem);
+      running_sum8 = _mm_add_pd(mult,running_sum8);
+    }
+    __m128i mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+		      15, 14, 13, 12, 11, 10, 9, 8);
+    __m128i sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum1, mask);
+    running_sum1 = _mm_add_pd(running_sum1,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum2, mask);
+    running_sum2 = _mm_add_pd(running_sum2,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum3, mask);
+    running_sum3 = _mm_add_pd(running_sum3,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum4, mask);
+    running_sum4 = _mm_add_pd(running_sum4,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum5, mask);
+    running_sum5 = _mm_add_pd(running_sum5,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum6, mask);
+    running_sum6 = _mm_add_pd(running_sum6,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum7, mask);
+    running_sum7 = _mm_add_pd(running_sum7,(__m128d)sum_shuffled);
+    sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum8, mask);
+    running_sum8 = _mm_add_pd(running_sum8,(__m128d)sum_shuffled);
+    // at this point the rses are right!!!
+    
+    
+    // mesh them into 4
+    __m128i mask_first = _mm_set_epi8(255,255,255,255,255,255,255,255,
+			      7 ,6 ,5, 4, 3, 2, 1, 0);
+    __m128i mask_second = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+			      255,255,255,255,255,255,255,255);
+    
+    running_sum1 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum1, mask_first);
+    running_sum2 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum2, mask_second);
+    running_sum1 = (__m128d)_mm_or_si128((__m128i)running_sum1, (__m128i)running_sum2);
+    
+    running_sum3 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum3, mask_first);
+    running_sum4 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum4, mask_second);
+    running_sum2 = (__m128d)_mm_or_si128((__m128i)running_sum3, (__m128i)running_sum4);
+    
+    running_sum5 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum5, mask_first);
+    running_sum6 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum6, mask_second);
+    running_sum3 = (__m128d)_mm_or_si128((__m128i)running_sum6, (__m128i)running_sum5);
+    
+    running_sum7 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum7, mask_first);
+    running_sum8 = (__m128d)_mm_shuffle_epi8((__m128i)running_sum8, mask_second);
+    running_sum4 = (__m128d)_mm_or_si128((__m128i)running_sum8, (__m128i)running_sum7);
+    
+    // RS 1-4 are right and expected here too
+    // rs 5-8 neglected and not required from now
+    
+    __m128i a01_round = convert_double_to_f48_SSE((__m128i)running_sum1);
+    __m128i a23_round = convert_double_to_f48_SSE((__m128i)running_sum2);
+    __m128i a45_round = convert_double_to_f48_SSE((__m128i)running_sum3);
+    __m128i a67_round = convert_double_to_f48_SSE((__m128i)running_sum4);
+    
+    // place them right for memory write 
+    __m128i match_mask = _mm_set_epi8(3,2,1,0,255,255,255,255,255,255,255,255,255,255,255,255); // mask used to match the missing spaces
+    __m128i a23_shuffled = _mm_shuffle_epi8((__m128i)a23_round, match_mask); // shuffle the positions required for the space in a01 for a2
+    a01_round = _mm_or_si128(a01_round,a23_shuffled);
+    
+    a23_round = _mm_srli_si128 (a23_round, 4); // using _mm_srli_si128 instead of _mm_sll_epi64 because the epi64 shitfs witin each double element in the 128 item
+    
+    match_mask = _mm_set_epi8(7,6,5,4,3,2,1,0,255,255,255,255,255,255,255,255); // reset the match mask for a4 and small bit of a5
+    __m128i a45_shuffled = _mm_shuffle_epi8((__m128i)a45_round, match_mask); // shuffle a45 to fit in a23
+    a23_round = _mm_or_si128(a23_round,a45_shuffled);
+    
+    a45_round = _mm_srli_si128(a45_round, 8); // using _mm_srli_si128 instead of _mm_sll_epi64 because the epi64 shitfs witin each double element in the 128 item
+    
+    match_mask = _mm_set_epi8(11,10,9,8,7,6,5,4,3,2,1,0,255,255,255,255);
+    __m128i a67_shuffled = _mm_shuffle_epi8((__m128i)a67_round, match_mask);
+    a45_round = _mm_or_si128(a45_round,a67_shuffled);
+
+     // WRITE BACK TO MEMORY!
+    _mm_storeu_pd((double*)&result[i], (__m128d)a01_round);    
+    _mm_storeu_pd(bofs(&result[i],2), (__m128d)a23_round);        
+    _mm_storeu_pd(bofs(&result[i],4), (__m128d)a45_round);  
+  }
+  vec = result;
+  
 }
 
 
@@ -1109,7 +1279,7 @@ void test_matrix_vector_mul_double_nonSSE()
   ofstream outputfile;
   outputfile.open ("results/level2/matrix_vector_mul_double_nonSSE.txt");
 
-  for ( int i = 0; i < 100; i++ ) {
+  for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
     matrix_vector_mul_double(matrix,a);
     stop = rdtsc();
@@ -1139,7 +1309,7 @@ void test_matrix_vector_mul_f48_nonSSE()
   ofstream outputfile;
   outputfile.open ("results/level2/matrix_vector_mul_f48_nonSSE.txt");
 
-  for ( int i = 0; i < 100; i++ ) {
+  for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
     matrix_vector_mul_f48(matrix,a);
     stop = rdtsc();
@@ -1153,15 +1323,9 @@ void test_matrix_vector_mul_f48_nonSSE()
   cout<<"Done. Results in results/level2/matrix_vector_mul_f48_nonSSE.txt"<<endl;
 }
 
-void test_matrix_vector_mul_f48_v1_SSE() 
-{
-  // IS THERE NEED FOR TWO VERSIONS OF F48 too?
-
-}
-
 void test_matrix_vector_mul_double_v1_SSE()
 {
-  cout<<"DOUBLE(v1) matrix-vector multiplication..." << endl;
+  cout<<"DOUBLE(SSE-v1) matrix-vector multiplication..." << endl;
   double* a = new double[size];
   double** matrix = new double*[size];
   populate_matrix(matrix);
@@ -1176,7 +1340,7 @@ void test_matrix_vector_mul_double_v1_SSE()
   ofstream outputfile;
   outputfile.open ("results/level2/matrix_vector_mul_double_v1.txt");
 
-  for ( int i = 0; i < 100; i++ ) {
+  for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
     matrix_vector_mul_SSE_double(matrix,a);
     stop = rdtsc();
@@ -1190,9 +1354,39 @@ void test_matrix_vector_mul_double_v1_SSE()
   cout<<"Done. Results in results/level2/matrix_vector_mul_double_v1.txt"<<endl;
 }
 
+void test_matrix_vector_mul_f48_v1_SSE() 
+{
+  cout<<"F48(SSE-v1) matrix-vector multiplication..." << endl;
+  f48* a = new f48[size];
+  f48** matrix = new f48*[size];
+  populate_matrix(matrix);
+  populate_array(a);
+
+  u64 start;
+  u64 stop;
+  u64 diff;
+  
+  // preparing file
+  ofstream outputfile;
+  outputfile.open ("results/level2/matrix_vector_mul_f48_v1.txt");
+
+  for ( int i = 0; i < runs; i++ ) {
+    start = rdtsc();
+    matrix_vector_mul_SSE_f48(matrix,a);
+    stop = rdtsc();
+    diff = stop - start;
+    outputfile<<diff<<endl;
+    // repopulate 
+    populate_matrix(matrix);
+    populate_array(a);
+  }
+  outputfile.close();
+  cout<<"Done. Results in results/level2/matrix_vector_mul_f48_v1.txt"<<endl;
+}
+
 void test_matrix_vector_mul_double_v2_SSE()
 {
-  cout<<"DOUBLE(v2) matrix-vector multiplication..." << endl;
+  cout<<"DOUBLE(SSE-v2) matrix-vector multiplication..." << endl;
   double* a = new double[size];
   double** matrix = new double*[size];
   populate_matrix(matrix);
@@ -1207,7 +1401,7 @@ void test_matrix_vector_mul_double_v2_SSE()
   ofstream outputfile;
   outputfile.open ("results/level2/matrix_vector_mul_double_v2.txt");
 
-  for ( int i = 0; i < 100; i++ ) {
+  for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
     matrix_vector_mul_SSE_double_v2(matrix,a);
     stop = rdtsc();
@@ -1221,28 +1415,93 @@ void test_matrix_vector_mul_double_v2_SSE()
   cout<<"Done. Results in results/level2/matrix_vector_mul_double_v2.txt"<<endl;
 }
 
-void build_report_matrix_vector_v1_v2_nonSSE_double()
+void test_matrix_vector_mul_f48_v2_SSE()
 {
-  cout<<"Compiling results in matrix-vector multiplication report..."<<endl;
-  ofstream myfile;
-  myfile.open ("results/level2/reports/matrix_vector_mul_report.csv");
+  cout<<"F48(SSE-v2) matrix-vector multiplication..." << endl;
+  f48* a = new f48[size];
+  f48** matrix = new f48*[size];
+  populate_matrix(matrix);
+  populate_array(a);
+
+  u64 start;
+  u64 stop;
+  u64 diff;
   
-  myfile<<"Matrix-vector Multiplication"<<endl;
-  myfile<<"non-SSE, SSE-v1, SSE-v2"<<endl;
-  string results_nonSSE[100]; // TODO: use the test results number from global here!
-  string results_SSEv1[100];
+  // preparing file
+  ofstream outputfile;
+  outputfile.open ("results/level2/matrix_vector_mul_f48_v2.txt");
+
+  for ( int i = 0; i < runs; i++ ) {
+    start = rdtsc();
+    matrix_vector_mul_SSE_f48_v2(matrix,a);
+    stop = rdtsc();
+    diff = stop - start;
+    outputfile<<diff<<endl;
+    // repopulate 
+    populate_matrix(matrix);
+    populate_array(a);
+  }
+  outputfile.close();
+  cout<<"Done. Results in results/level2/matrix_vector_mul_f48_v2.txt"<<endl;
+}
+
+void test_matrix_vector_mul_f48_loopunroll_SSE()
+{
+  cout<<"F48(SSE-loop-unroll) matrix-vector multiplication..." << endl;
+  f48* a = new f48[size];
+  f48** matrix = new f48*[size];
+  populate_matrix(matrix);
+  populate_array(a);
+
+  u64 start;
+  u64 stop;
+  u64 diff;
+  
+  // preparing file
+  ofstream outputfile;
+  outputfile.open ("results/level2/matrix_vector_mul_f48_loopunroll.txt");
+
+  for ( int i = 0; i < runs; i++ ) {
+    start = rdtsc();
+    matrix_vector_mul_SSE_f48_loop_unrolled(matrix,a);
+    stop = rdtsc();
+    diff = stop - start;
+    outputfile<<diff<<endl;
+    // repopulate 
+    populate_matrix(matrix);
+    populate_array(a);
+  }
+  outputfile.close();
+  cout<<"Done. Results in results/level2/matrix_vector_mul_f48_loopunroll.txt"<<endl;
+}
+
+
+// FUNCTION REQUIRES TEST RESULTS FROM DOUBLE AND F48 IN THE PROPER FILES
+void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
+{
+  string double_results_nonSSE[runs];
+  string double_results_SSEv1[runs];
+  string double_results_SSEv2[runs];
+  string f48_results_nonSSE[runs];
+  string f48_results_SSEv1[runs];
+  string f48_results_SSEv2[runs];
+  string f48_results_SSE_loopunroll[runs];
+  
+  // populating results from files
   string line;
+  
+  // double results (nonsse, ssev1, ssev2)
   ifstream test_nonSSE ("results/level2/matrix_vector_mul_double_nonSSE.txt");
   int i=0;
   if (test_nonSSE.is_open())
   {
     while ( getline (test_nonSSE,line) )
     {
-      results_nonSSE[i] = line;
+      double_results_nonSSE[i] = line;
       i++;
     }
     test_nonSSE.close();
-  }
+  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_double_nonSSE.txt)";
   
   ifstream test_SSEv1 ("results/level2/matrix_vector_mul_double_v1.txt");
   i=0; // reset count
@@ -1250,24 +1509,86 @@ void build_report_matrix_vector_v1_v2_nonSSE_double()
   {
     while ( getline (test_SSEv1,line) )
     {
-      results_SSEv1[i] = line;
+      double_results_SSEv1[i] = line;
       i++;
     }
     test_SSEv1.close();
-  }
+  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_double_v1.txt)"; 
+  
   ifstream test_SSEv2 ("results/level2/matrix_vector_mul_double_v2.txt");
   i=0; // reset count
   if (test_SSEv2.is_open())
   {
     while ( getline (test_SSEv2,line) )
     {
-      myfile<<results_nonSSE[i]<<","<<results_SSEv1[i]<<","<<line<<endl;
+      double_results_SSEv2[i] = line;
       i++;
     }
     test_SSEv2.close();
+  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_double_v2.txt)"; 
+  
+  // f48 results (nonsse, ssev1, ssev2, sseloopunroll)
+  ifstream test_nonSSE_f48 ("results/level2/matrix_vector_mul_f48_nonSSE.txt");
+  i=0;
+  if (test_nonSSE_f48.is_open())
+  {
+    while ( getline (test_nonSSE_f48,line) )
+    {
+      f48_results_nonSSE[i] = line;
+      i++;
+    }
+    test_nonSSE_f48.close();
+  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_nonSSE.txt)";
+  
+  ifstream test_SSEv1_f48 ("results/level2/matrix_vector_mul_f48_v1.txt");
+  i=0; // reset count
+  if (test_SSEv1_f48.is_open())
+  {
+    while ( getline (test_SSEv1_f48,line) )
+    {
+      f48_results_SSEv1[i] = line;
+      i++;
+    }
+    test_SSEv1_f48.close();
+  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_v1.txt)"; 
+  
+  ifstream test_SSEv2_f48 ("results/level2/matrix_vector_mul_f48_v2.txt");
+  i=0; // reset count
+  if (test_SSEv2_f48.is_open())
+  {
+    while ( getline (test_SSEv2_f48,line) )
+    {
+      f48_results_SSEv2[i] = line;
+      i++;
+    }
+    test_SSEv2_f48.close();
+  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_v2.txt)"; 
+  
+  ifstream test_SSEloop_f48 ("results/level2/matrix_vector_mul_f48_loopunroll.txt");
+  i=0; // reset count
+  if (test_SSEloop_f48.is_open())
+  {
+    while ( getline (test_SSEloop_f48,line) )
+    {
+      f48_results_SSE_loopunroll[i] = line;
+      i++;
+    }
+    test_SSEloop_f48.close();
+  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_loopunroll.txt)"; 
+  
+  
+  
+  ofstream myfile;
+  myfile.open ("results/level2/reports/matrix_vector_mul_report.csv");
+  
+  myfile<<"Matrix-vector Multiplication,,,,,,"<<endl;
+  myfile<<"Double,,,F48,,,"<<endl;
+  myfile<<"non-SSE,SSE-v1,SSE-v2,non-SSE,SSE-v1,SSE-v2,SSE-loop un-rolled"<<endl;
+  // TODO: refactor to new structure ^^
+  for(i=0;i<runs;i++){
+    myfile<<double_results_nonSSE[i]<<","<<double_results_SSEv1[i]<<","<<double_results_SSEv2[i]<<","<<f48_results_nonSSE[i]<<","<<f48_results_SSEv1[i]<<","<<f48_results_SSEv2[i]<<","<<f48_results_SSE_loopunroll[i]<<endl;
   }
-  else cout << "Unable to open file"; 
-   myfile.close();
+  myfile.close();
   cout<<"Matrix-vector multiplication results compiled for non-SSE,SSEv1,SSEv2. (results/level2/reports/matrix_vector_mul_report.txt)"<<endl;
 }
 
@@ -1356,7 +1677,8 @@ void build_report_scaling()
 
 // TODO: add number of runs for test results global
 /************* MAIN ***********************/
-int main()
+
+int main(int argc, char* argv[])
 {
 
 
@@ -1380,20 +1702,20 @@ int main()
 
   
 // int x;
-f48 a[8];
- a[0] = f48(1.5);
- a[1] = f48(64.9);
- a[2] = f48(12.8);
- a[3] = f48(1.4);
- a[4] = f48(3.2);
- a[5] = f48(2.1);
- a[6] = f48(1.89);
- a[7] = f48(1.3);
+// f48 a[8];
+//  a[0] = f48(1.5);
+//  a[1] = f48(64.9);
+//  a[2] = f48(12.8);
+//  a[3] = f48(1.4);
+//  a[4] = f48(3.2);
+//  a[5] = f48(2.1);
+//  a[6] = f48(1.89);
+//  a[7] = f48(1.3);
 //  a[2] = f48(2.1);
 // a[3] = f48(7.1);
- double b[2];
- b[0] = 4.25649874;
- b[1] = 122.216548;
+//  double b[2];
+//  b[0] = 4.25649874;
+//  b[1] = 122.216548;
 //   double c[2];
 //  c[0] = 3.8;
 //  c[1] = 3.1;
@@ -1430,62 +1752,64 @@ f48 a[8];
 //  build_report_scaling();
  
 // TEST TEST TEST
- f48** matrix = new f48*[4];
-for(int i = 0; i < 4; ++i){
-    matrix[i] = new f48[4];
-}
+//  f48** matrix = new f48*[8];
+// for(int i = 0; i < 8; ++i){
+//     matrix[i] = new f48[8];
+// }
+// 
+// for(unsigned i=0;i<8;i++) {
+//     for(unsigned j=0;j<8;j++) {
+// 
+//         matrix[i][j] = f48(j);
+//     }
+// }
+// 
+// 
+// for(unsigned i=0;i<8;i++) {
+//     for(unsigned j=0;j<8;j++) {
+//         cout<<(double)matrix[i][j]<<"\t";
+//     }
+//     cout<<endl;
+// }
+// 
+// f48* vector = new f48[8];
+// for(unsigned i=0;i<8;i++){
+//   vector[i] = f48(i);
+// }
+// for(unsigned i=0;i<8;i++){
+//   cout <<(double)vector[i]<<endl;
+// }
+// 
+// u64 start;
+// u64 stop;
+// u64 v1;
+// u64 v2;
+// u64 v2v1;
+// // matrix_vector_mul_SSE_f48(matrix,vector);
+// 
+// start = rdtsc();
+// matrix_vector_mul_SSE_f48_loop_unrolled(matrix,vector);
+// stop = rdtsc();
+// v1 = stop-start;
+// cout<<endl<<endl;
+// for(unsigned i=0;i<8;i++){
+//   cout <<(double)vector[i]<<endl;
+// }
 
-for(unsigned i=0;i<4;i++) {
-    for(unsigned j=0;j<4;j++) {
-//         cout<<"Enter the"<<i+1<<"*"<<j+1<<"entry";
-// 	double test;
-// 	cin>>test;
-	
-        matrix[i][j] = f48(j);
-    }
-}
 
 
-for(unsigned i=0;i<4;i++) {
-    for(unsigned j=0;j<4;j++) {
-        cout<<(double)matrix[i][j]<<"\t";
-    }
-    cout<<endl;
-}
-
-f48* vector = new f48[4];
-for(unsigned i=0;i<4;i++){
-  vector[i] = f48(i);
-}
-for(unsigned i=0;i<4;i++){
-  cout <<(double)vector[i]<<endl;
-}
-
-u64 start;
-u64 stop;
-u64 v1;
-u64 v2;
-u64 v2v1;
-// matrix_vector_mul_SSE_f48(matrix,vector);
-
-start = rdtsc();
-matrix_vector_mul_SSE_f48(matrix,vector);
-stop = rdtsc();
-v1 = stop-start;
-
-for(unsigned i=0;i<4;i++){
-  cout <<(double)vector[i]<<endl;
-}
- 
  //TESTING
 // test_matrix_vector_mul_double_v1_SSE();
 // test_matrix_vector_mul_double_v2_SSE();
 // test_matrix_vector_mul_double_nonSSE();
 //  build_report_matrix_vector_v1_v2_nonSSE_double();
+
+//  test_matrix_vector_mul_f48_v1_SSE();
+// test_matrix_vector_mul_f48_v2_SSE();
  
  // TESTING
 //  test_matrix_vector_mul_f48_nonSSE();
- 
+//  test_matrix_vector_mul_f48_loopunroll_SSE();
  
 // start = rdtsc();
 // matrix_vector_mul_SSE_double_v2(matrix,vector);
@@ -1503,23 +1827,73 @@ cout<<"V2-V1: "<<v2-v1<<endl;*/
 // int test;
 // cin>>test;
 
-// matrix_vector_mul_SSE_double testing versions - on small scale 4*4 with 4 vector
-// V1: 6916  | V1: 6992  | V1: 7000
-// V2: 72    | V2: 60    | V2: 60
-// TODO: test on bigger sizes such as 1024*1024 x 1024*1024 with 1024 vec & see results of timmings between v1 & v2
-// TODO: maybe add hadd in v3 just for comparison
-// 
 
+int option=0;
+int inneroption=0;
+do { 
+  cout << "1) BLAS level 1" << endl;
+  cout << "2) BLAS level 2" << endl;
+  cout << "3) BLAS level 3" << endl;
+  cout << "4) Exit " << endl;
+  //Prompting user to enter an option according to menu
+  cout << "Please select an option: ";
+  cin >> option;  // taking option value as input and saving in variable "option"
+  
+  switch(option) {
+    case 1: cout<<"BLAS LEVEL 1 SELECTED!"<<endl;
+      break;
+    case 2: 
+      cout<<endl<<"BLAS LEVEL 2 SELECTED"<<endl;
+      do{
+	cout << "1) Double tests" << endl;
+	cout << "2) F48 tests" << endl;
+	cout << "3) Build comparison report" << endl;
+	cout << "4) Back " << endl;
+	cout << "Please select an option: ";
+	cin >> inneroption;  // taking option value as input and saving in variable "option"
+	 switch(inneroption) {
+	   case 1:
+	     cout<<endl<<"Running matrix-vector tests on doubles"<<endl;
+	     test_matrix_vector_mul_double_nonSSE();
+	     cout<<endl;
+	     test_matrix_vector_mul_double_v1_SSE();
+	     cout<<endl;
+	     test_matrix_vector_mul_double_v2_SSE();
+	     cout<<endl;
+	     break;
+	   case 2:
+	     cout<<endl<<"Running matrix-vector tests on f48"<<endl;
+	     test_matrix_vector_mul_f48_nonSSE();
+	     cout<<endl;
+	     test_matrix_vector_mul_f48_v1_SSE();
+	     cout<<endl;
+	     test_matrix_vector_mul_f48_v2_SSE();
+	     cout<<endl;
+	     test_matrix_vector_mul_f48_loopunroll_SSE();
+	     cout<<endl;
+	     break;
+	   case 3:
+	     cout<<endl<<"Compiling results in matrix-vector multiplication report..."<<endl;
+	     build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48();
+	     cout<<endl;
+	     break;
+	   case 4: cout<<"going back to main menu"<<endl<<endl;
+	     break;
+	   default: cout<<"try again";
+	     break;
+	 }
+      }while(inneroption != 4);
+      break;
+    case 3: cout<<"BLAS LEVEL 3 SELECTED!"<<endl;
+      break;
+    case 4: cout<<"Exiting program"<<endl;
+      return 0;
+      break;
+    default: cout<<"Unknown option, please try again!"<<endl;
+      break;
+  }
 
-
-
-
-
-
-
-
-
-
+} while(option != 4);
 
 
 
