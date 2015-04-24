@@ -547,7 +547,8 @@ double dot_product_SSE_double (double *a, double *b) {
 	}
 	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
 	// store result into double
-	_mm_store1_pd(&total, result_vec);
+// 	_mm_store1_pd(&total, result_vec);
+	_mm_store_sd(&total, result_vec);
 	return total;
 }
 
@@ -568,7 +569,8 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 		 result_vec = _mm_add_pd(temp_vect, result_vec);  //performs vertical addition
 	}
 	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
-	_mm_store1_pd(&total, result_vec);
+// 	_mm_store1_pd(&total, result_vec);
+	_mm_store_sd(&total, result_vec); 
 	f48 total_result (total);
 	return total_result;
 }
@@ -592,7 +594,8 @@ f48 absolute_max_SSE_f48 (f48 *a){
   __m128d max_result = _mm_max_pd((__m128d)max, (__m128d)max_shuffled);
   // store one of max into a double and print double
   double maximum=0;
-  _mm_store1_pd(&maximum, max_result);
+//   _mm_store1_pd(&maximum, max_result);
+  _mm_store_sd(&maximum, max_result);
   f48 max_f48 (maximum);
   return max_f48;
 }
@@ -616,7 +619,8 @@ f48 absolute_min_SSE_f48 (f48 *a) {
   __m128d min_result = _mm_min_pd((__m128d)min, (__m128d)min_shuffled);
   // store one of min into a double and print double
   double minimum=0;
-  _mm_store1_pd(&minimum, min_result);
+//   _mm_store1_pd(&minimum, min_result);
+  _mm_store_sd(&minimum, min_result);
   f48 max_f48 (minimum);
   return max_f48;
 }
@@ -633,7 +637,8 @@ double absolute_max_SSE_double (double *a){
   __m128i max_shuffled = _mm_shuffle_epi8((__m128i)max, mask);
   __m128d max_result = _mm_max_pd(max, (__m128d)max_shuffled);
   double maximum=0;
-  _mm_store1_pd(&maximum, max_result);
+//   _mm_store1_pd(&maximum, max_result);
+  _mm_store_sd(&maximum, max_result);
   return maximum;
 }
 
@@ -649,7 +654,8 @@ double absolute_min_SSE_double (double *a){
   __m128i min_shuffled = _mm_shuffle_epi8((__m128i)min, mask);
   __m128d min_result = _mm_min_pd(min, (__m128d)min_shuffled);
   double minimum=0;
-  _mm_store1_pd(&minimum, min_result);
+//   _mm_store1_pd(&minimum, min_result);
+  _mm_store_sd(&minimum, min_result);
   return minimum;
 }
 
@@ -667,7 +673,8 @@ f48 magnitude_SSE_f48 (f48 *a){
   result_vec = _mm_hadd_pd(result_vec, result_vec);
   result_vec = _mm_sqrt_pd(result_vec);
   double res=0;
-  _mm_store1_pd(&res, result_vec);
+//   _mm_store1_pd(&res, result_vec);
+  _mm_store_sd(&res, result_vec);
   return f48(res);
 }
 
@@ -682,7 +689,8 @@ double magnitude_SSE_double (double *a){
   result_vec = _mm_hadd_pd(result_vec, result_vec);
   result_vec = _mm_sqrt_pd(result_vec);
   double res=0;
-  _mm_store1_pd(&res, result_vec);
+//   _mm_store1_pd(&res, result_vec);
+  _mm_store_sd(&res, result_vec);
   return res;
 }
 
@@ -781,7 +789,7 @@ void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
     __m128i sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum, shuffling_mask);
     running_sum = _mm_add_pd(running_sum,(__m128d)sum_shuffled);
     double temp=0;
-    _mm_store1_pd(&temp, running_sum);
+    _mm_store_sd(&temp, running_sum);
     result[i]=f48(temp);
   }
   vec = result;
@@ -869,9 +877,9 @@ void matrix_vector_mul_SSE_f48_v2(f48** mat, f48* &vec)
     sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum2, mask);
     running_sum2 = _mm_add_pd(running_sum2,(__m128d)sum_shuffled);
     double temp = 0;
-    _mm_store1_pd((double*)&temp, running_sum2);
+    _mm_store_sd((double*)&temp, running_sum2);
     result[i] = f48(temp);
-    _mm_store1_pd((double*)&temp, running_sum2);
+    _mm_store_sd((double*)&temp, running_sum2);
     result[i+1] = f48(temp);
   }
   vec = result;
