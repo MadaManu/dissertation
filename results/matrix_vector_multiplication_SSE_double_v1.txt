@@ -1,1 +1,0 @@
-Magnitude test (f48 vs double)
