@@ -11,28 +11,19 @@
 #include <fstream>
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 using namespace std;
 
-const int size = 1024;
-const int runs = 100;
+struct stat st = {0};
+
+int size = 1024*1024;
+int runs = 100;
 
 typedef unsigned long long u64;
 typedef unsigned short u16;
-
-
-//template<typename T>
-//void show_binrep(const T& a)
-//{
-//    const char* beg = reinterpret_cast<const char*>(&a);
-//    const char* end = beg + sizeof(a);
-//	std::cout<<" => ";
-//    while(beg != end)
-//        std::cout << std::bitset<CHAR_BIT>(*beg++) << ' ';
-//    std::cout << '\n';
-//}
-
-
 
 union conversion_union {
   unsigned long long l;
@@ -61,8 +52,8 @@ public:
   operator double();
 } __attribute__((packed));
 
-#define INTEL_TYPE_CONVERSIONS 1
-#if INTEL_TYPE_CONVERSIONS
+
+/*************** F48 ***************/
 f48::f48(double value)
 {
   // TODO: optimize this code!
@@ -151,44 +142,7 @@ f48::operator double()
   return convert.d; 
 }
 
-#else
-f48::f48(double value)
-{
-  union un temp;
-  u64 round;
-	
-  // convert to 64-bit pattern
-  temp.f = value;
-
-  // simple rounding
-  temp.u = temp.u + ((1 << 15)-1);
-  
-  /*
-  // round to nearest even
-  round = temp.u;
-  round = (round + ((1 << 15)-1)) | round << 1;
-  need to look at that PhD thesis that describes rounding
-  */
-
-  // compensate for little-endianness
-  this->num = temp.u >> 16;
-}
-
-f48::operator double()
-{
-  union un temp;
-  double result;
-
-  temp.u = this->num;
-
-  // compensate for little-endianness
-  temp.u = temp.u << 16;
-
-  return temp.f;
-}
-#endif
-
-/************************************************************/
+/****************** HELPER FUNCTIONS ******************/
 
 template <class T>
 void populate_array(T * a)
@@ -226,101 +180,9 @@ unsigned long long rdtsc()
   return (((u64)high) << 32) | low;
 }
 
-template <class T>
-T sum_arrays(T * a, T * b, T * c)
-{
-  T result;
-  for ( int i = 0; i < size; i++ ) {
-    T sum = a[i] + b[i];
-    c[i] = sum;
-    result = result + sum;
-  }
-  return result;
-}
 
-u48 sum_arrays_SSE(u48 * a, u48 * b, u48 * c)
-{
-  u48 result;
-  __m128i result_vec = _mm_set1_epi32(0);
-  // insert zeroes in the two upper bytes
-  const __m128i in_mask = _mm_set_epi8(255, 255, 11, 10, 9, 8,  7,  6,
-				    255, 255, 5, 4, 3, 2, 1, 0);
-  // I'm not quite sure that this out mask is correct
-  const __m128i out_mask = _mm_set_epi8(0, 1, 2,   3,  4,  5,
-					8, 9, 10, 11, 12, 13,
-					255, 255, 255, 255);
 
-  long long tmp[2];
-
-  for ( int i = 0; i < size; i+= 2 ) {
-    __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
-    a_vec = _mm_shuffle_epi8(a_vec, in_mask);
-    __m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
-    b_vec = _mm_shuffle_epi8(b_vec, in_mask);
-    __m128i sum_vec = _mm_add_epi64(a_vec, b_vec);
-    // need to shuffle data before writing out
-    //cout << hex << a[i] + b[i] << " | " <<  a[i+1] + b[i+1] << endl;
-    //u64 temp[2];
-    //_mm_storeu_si128((__m128i*)temp, sum_vec);
-    //cout << hex << temp[0] << " | " <<  temp[1] << endl;
-    __m128i out_vec = _mm_shuffle_epi8(out_mask, sum_vec);
-    _mm_storeu_si128((__m128i*)&c[i], out_vec);
-    result_vec = _mm_add_epi64(result_vec, sum_vec);
-  }
-  _mm_storeu_si128((__m128i*)tmp, result_vec);
-  result = tmp[0] + tmp[1];
-
-  return result;
-}
-
-f48 sum_arrays_SSE_f48(f48 * a, f48 * b, f48 * c)
-{
-  f48 result;
-  __m128d result_vec = _mm_set1_pd(0.0);
-
-  // the masking is different for f48 compared to u48.
-  // with f48 we want to insert zeroes for the two lower bytes
-  __m128i mask = _mm_set_epi8(11, 10, 9, 8,  7,  6, 255, 255,
-  			      5, 4, 3, 2, 1, 0, 255, 255);
-
-  double tmp[2];
-
-  for ( int i = 0; i < size; i+= 2 ) {
-    __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
-    a_vec = _mm_shuffle_epi8(a_vec, mask);
-    __m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
-    b_vec = _mm_shuffle_epi8(b_vec, mask);
-    __m128d sum_vec = _mm_add_pd((__m128d)a_vec, (__m128d)b_vec);
-    // BUG: need to round data before writing out
-    // BUG: need to shuffle data before writing out
-    _mm_storeu_pd((double*)&c[i], sum_vec);
-    result_vec = _mm_add_pd(result_vec, sum_vec);
-  }
-  _mm_storeu_pd(tmp, result_vec);
-  result = tmp[0] + tmp[1];
-
-  return result;
-}
-
-double sum_arrays_SSE_double(double * a, double * b, double *c)
-{
-  double result;
-  __m128d result_vec = _mm_set1_pd(0.0);
-
-  double tmp[2];
-  for ( int i = 0; i < size; i+= 2 ) {
-    __m128d a_vec = _mm_loadu_pd(&a[i]);
-    __m128d b_vec = _mm_loadu_pd(&b[i]);
-    __m128d sum_vec = _mm_add_pd(a_vec, b_vec);
-    _mm_storeu_pd(&c[i], sum_vec);
-    result_vec = _mm_add_pd(result_vec, sum_vec);
-  }
-  _mm_storeu_pd(tmp, result_vec);
-  result = tmp[0] + tmp[1];
-
-  return result;
-}
-
+/************** CONVERSION FUNCTION SSE **************/
 __m128i convert_double_to_f48_SSE (__m128i a)
 {
 	// convert from 2 double in vector to 2 rounded f48  
@@ -352,13 +214,19 @@ __m128i convert_double_to_f48_SSE (__m128i a)
 // 	return (__m128i)result;
 }
 
+
+
+/************ IMPLEMENTATION ************/
+
+    /*** LEVEL 1 ***/
+
 void scale_f48_vector_SSE (f48 * a, f48 scalar)
 {
    double double_scalar = (double)scalar;
   __m128d scalar_vec = _mm_load1_pd(&double_scalar);
   // set the mask to be used by loading in the unrolled loop
   __m128i mask = _mm_set_epi8(11, 10, 9, 8,  7,  6, 255, 255,
-  			      5, 4, 3, 2, 1, 0, 255, 255);
+              5, 4, 3, 2, 1, 0, 255, 255);
   
    
   for ( int i = 0; i < size; i+=8 ) { // should be size
@@ -379,8 +247,6 @@ void scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a67 = _mm_loadu_si128((__m128i*)(&a[i+6])); // load a[6] and a[7]
     a67 = _mm_shuffle_epi8(a67, mask);
     
-    
-    
     // SCALE THEM UP
     __m128d res_a01 = _mm_mul_pd((__m128d)a01, (__m128d)scalar_vec);
     __m128d res_a23 = _mm_mul_pd((__m128d)a23, (__m128d)scalar_vec);
@@ -392,8 +258,7 @@ void scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a23_round = convert_double_to_f48_SSE((__m128i)res_a23);
     __m128i a45_round = convert_double_to_f48_SSE((__m128i)res_a45);
     __m128i a67_round = convert_double_to_f48_SSE((__m128i)res_a67);
-    
-        
+           
    // place them right for memory write 
     __m128i match_mask = _mm_set_epi8(3,2,1,0,255,255,255,255,255,255,255,255,255,255,255,255); // mask used to match the missing spaces
     __m128i a23_shuffled = _mm_shuffle_epi8((__m128i)a23_round, match_mask); // shuffle the positions required for the space in a01 for a2
@@ -411,16 +276,13 @@ void scale_f48_vector_SSE (f48 * a, f48 scalar)
     __m128i a67_shuffled = _mm_shuffle_epi8((__m128i)a67_round, match_mask);
     a45_round = _mm_or_si128(a45_round,a67_shuffled);
     
-    #define bofs(base, ofs) (((double*)(base))+ofs)
+    #define bofs(base, ofs) (((double*)(base))+ofs) // INTERESTING TO TALK ABOUT THIS LITTLE FUNCTION!!!
 
     // WRITE BACK TO MEMORY
     _mm_storeu_pd(bofs(&a[i],0), (__m128d)a01_round);    
     _mm_storeu_pd(bofs(&a[i],2), (__m128d)a23_round);        
     _mm_storeu_pd(bofs(&a[i],4), (__m128d)a45_round);    
-   
-    
   }
-
 }
 
 void scale_double_vector_SSE (double * a, double scalar)
@@ -435,102 +297,6 @@ void scale_double_vector_SSE (double * a, double scalar)
   }
 }
 
-
-/***************** TEST FUNCTIONS **************/
-template <class T>
-void test_type(T dummy, string s)
-{
-  T * a = new T[size];
-  T * b = new T[size];
-  T * c = new T[size];
-
-  populate_array(a);
-  populate_array(b);
-
-  u64 start;
-  T sum;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 10; i++ ) {
-    start = rdtsc();
-    sum = sum_arrays(a, b, c);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << s << diff << " " << sum << " "<< sizeof(u48) << endl;
-  }
-}
-
-void test_u48_vec()
-{
-  u48 * a = new u48[size];
-  u48 * b = new u48[size];
-  u48 * c = new u48[size];
-
-  populate_array(a);
-  populate_array(b);
-
-  u64 start;
-  u48 sum;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 10; i++ ) {
-    start = rdtsc();
-    sum = sum_arrays_SSE(a, b, c);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << "u48 vec "<< diff << " " << sum << " "<< sizeof(u48) << endl;
-  }
-}
-
-void test_f48_vec()
-{
-  f48 * a = new f48[size];
-  f48 * b = new f48[size];
-  f48 * c = new f48[size];
-
-  populate_array(a);
-  populate_array(b);
-
-  u64 start;
-  f48 sum;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 10; i++ ) {
-    start = rdtsc();
-    sum = sum_arrays_SSE_f48(a, b, c);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << "f48 vec "<< diff << " " << sum << " "<< sizeof(u48) << endl;
-  }
-}
-
-void test_double_vec()
-{
-  double * a = new double[size];
-  double * b = new double[size];
-  double * c = new double[size];
-
-  populate_array(a);
-  populate_array(b);
-
-  u64 start;
-  double sum;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 10; i++ ) {
-    start = rdtsc();
-    sum = sum_arrays_SSE_double(a, b, c);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << "f64 vec "<< diff << " " << sum << " "<< sizeof(double) << endl;
-  }
-}
-
-// TODO: function to take size
 double dot_product_SSE_double (double *a, double *b) {
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
@@ -552,7 +318,6 @@ double dot_product_SSE_double (double *a, double *b) {
 	return total;
 }
 
-// TODO: function to take size
 f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
@@ -575,7 +340,6 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	return total_result;
 }
 
-// TODO: function to take size
 f48 absolute_max_SSE_f48 (f48 *a){
   __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 			       5,  4, 3, 2, 1, 0, 255, 255);
@@ -600,7 +364,6 @@ f48 absolute_max_SSE_f48 (f48 *a){
   return max_f48;
 }
 
-// TODO: function to take size
 f48 absolute_min_SSE_f48 (f48 *a) {
     __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 			       5,  4, 3, 2, 1, 0, 255, 255);
@@ -625,7 +388,6 @@ f48 absolute_min_SSE_f48 (f48 *a) {
   return max_f48;
 }
 
-// TODO: function to take size
 double absolute_max_SSE_double (double *a){
   __m128d max = _mm_load_pd(&a[0]);
   for ( int i = 2; i < size; i+= 2 ) { 
@@ -642,7 +404,6 @@ double absolute_max_SSE_double (double *a){
   return maximum;
 }
 
-// TODO: function to take size
 double absolute_min_SSE_double (double *a){
   __m128d min = _mm_load_pd(&a[0]);
   for ( int i = 2; i < size; i+= 2 ) { 
@@ -659,7 +420,6 @@ double absolute_min_SSE_double (double *a){
   return minimum;
 }
 
-// TODO: function to take size
 f48 magnitude_SSE_f48 (f48 *a){
   __m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
   __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
@@ -678,7 +438,6 @@ f48 magnitude_SSE_f48 (f48 *a){
   return f48(res);
 }
 
-// TODO: function to take size
 double magnitude_SSE_double (double *a){
   __m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
   for ( int i = 0; i < size; i+= 2 ) { 
@@ -693,7 +452,9 @@ double magnitude_SSE_double (double *a){
   _mm_store_sd(&res, result_vec);
   return res;
 }
+    /*** END LEVEL 1 ***/
 
+    /*** LEVEL 2 ***/
 // TODO: implement same using f48 maybe to compare some timmings
 // TODO: function to take size
 // function is void as should overwrite the input
@@ -807,6 +568,8 @@ void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
 // a*W+b*W+c*W+d*W | e*X+f*X+g*X+h*X and stores them @ &vec[0] (storing first result in vec[0] & second result in vec[1]
 // i*Y+j*Y+k*Y+l*Y | m*Z+n*Z+o*Z+p*Z and stores them @ &vec[2] (storing first result in vec[2] & second result in vec[3]
 // 
+// 
+// ^^ TODO: FIX THIS EXPLANATION AND DO SIMILAR FOR EACH FUNCTION IN THE IMPLEMENTATION!!!! 
 //
 void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
 {
@@ -962,9 +725,7 @@ void matrix_vector_mul_SSE_f48_loop_unrolled (f48** mat, f48* &vec)
     running_sum7 = _mm_add_pd(running_sum7,(__m128d)sum_shuffled);
     sum_shuffled = _mm_shuffle_epi8((__m128i)running_sum8, mask);
     running_sum8 = _mm_add_pd(running_sum8,(__m128d)sum_shuffled);
-    // at this point the rses are right!!!
-    
-    
+
     // mesh them into 4
     __m128i mask_first = _mm_set_epi8(255,255,255,255,255,255,255,255,
 			      7 ,6 ,5, 4, 3, 2, 1, 0);
@@ -1011,283 +772,406 @@ void matrix_vector_mul_SSE_f48_loop_unrolled (f48** mat, f48* &vec)
     match_mask = _mm_set_epi8(11,10,9,8,7,6,5,4,3,2,1,0,255,255,255,255);
     __m128i a67_shuffled = _mm_shuffle_epi8((__m128i)a67_round, match_mask);
     a45_round = _mm_or_si128(a45_round,a67_shuffled);
-
      // WRITE BACK TO MEMORY!
     _mm_storeu_pd((double*)&result[i], (__m128d)a01_round);    
     _mm_storeu_pd(bofs(&result[i],2), (__m128d)a23_round);        
     _mm_storeu_pd(bofs(&result[i],4), (__m128d)a45_round);  
   }
   vec = result;
-  
 }
+    /*** END LEVEL 2 ***/
 
+    /*** LEVEL 3 ***/
+// TODO ADD L3 implementation
 
-void test_f48_dot_prod()
+      /** MATRIX MATRIX MUL double **/
+double** matrix_matrix_mul_double(double** a, double** b) 
 {
-  cout<<"f48 dot product" << endl;
-  cout<<"RDTSC diff" << endl;
-  f48 * a = new f48[size];
-  f48 * b = new f48[size];
-
-  populate_array(a);
-  populate_array(b);
-
-  u64 start;
-  f48 dot_prod;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 100; i++ ) {
-    start = rdtsc();
-    dot_prod = dot_product_SSE_f48(a, b);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << diff << ',';
+  double** res = new double*[size];
+  for(int i=0; i<size; i++) {
+    res[i] = new double[size];
   }
-  cout<<endl;
+  for(int i=0; i<size; i++) { // a row count
+    for(int j=0; j<size; j++) { // b column count
+      double sum = 0; // init sum
+      for(int k=0; k<size; k++) { // k offset
+        sum += a[i][k]*b[k][j];
+      }
+      res[i][j] = sum;
+    }
+  }
+  return res;
 }
 
+      /** MATRIX MATRIX MUL f48 **/
+f48** matrix_matrix_mul_f48(f48** a, f48** b) {
+  f48** res = new f48*[size];
+  for(int i=0; i<size; i++) {
+    res[i] = new f48[size];
+  }
+  for(int i=0; i<size; i++) {
+    for(int j=0; j<size; j++) {
+      double sum = 0; // compute the sum in doubles
+      for(int k=0; k<size; k++) {
+        sum += double(a[i][k])*double(b[k][j]);
+      }
+      // save back to memory in f48 format
+      res[i][j] = f48(sum);
+    }
+  }
+  return res;
+}
+
+      /** MATRIX MATRIX MUL double SSE **/
+double** matrix_matrix_mul_double_SSE() {
+  double** res = new double*[8];
+  for(int i=0; i<8; i++) {
+    res[i] = new double[8];
+  }
+
+  // do magic here
+
+  return res;
+}
+
+    /*** END LEVEL 3 ***/
+
+/************ END IMPLEMENTATION ************/
+
+/************ TESTS ************/
+
+    /*** LEVEL 1 ***/
+
+      /** DOT PRODUCT double **/
 void test_double_dot_prod()
 {
-  cout<<"DOUBLE dot product" << endl;
-  cout<<"RDTSC diff" << endl;
+  cout<<"DOUBLE(SSE) dot product..." << endl;
+  // declaration
   double * a = new double[size];
   double * b = new double[size];
+  u64 start,stop,diff;
+  ofstream myfile;
 
+  // initialisation
   populate_array(a);
   populate_array(b);
+  char path[256];
+  sprintf(path, "results/level1/%d/dot_prod_SSE_double.txt", size);
+  myfile.open (path);
 
-  u64 start;
-  double dot_prod;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 100; i++ ) {
+  // run tests
+  for (int i=0; i<runs; i++) {
     start = rdtsc();
-    dot_prod = dot_product_SSE_double(a, b);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << diff << ',';
-  }
-}
-
-void test_f48_scale()
-{
-  cout<<"f48 scaling SSE..." << endl;
-  f48 * a = new f48[size];
-  populate_array(a);
-  srand(5);
-  f48 scalar = f48(rand() % 1024);
-
-  u64 start;
-  u64 stop;
-  u64 diff;
-  ofstream myfile;
-  myfile.open ("macneill_results/scale_SSE_f48.txt");
-
-  for ( int i = 0; i < 100; i++ ) {
-    start = rdtsc();
-    scale_f48_vector_SSE(a, scalar);
+    dot_product_SSE_double(a, b);
     stop = rdtsc();
     diff = stop - start;
     myfile<<diff<<endl;
-//     cout << diff << ",";
+    // repopulate
+    populate_array(a);
+    populate_array(b);
   }
-  cout<<"Done. Results in macneill_results/scale_SSE_f48.txt "<<endl;
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/dot_prod_SSE_double.txt"<<endl;
 }
 
+      /** DOT PRODUCT f48 **/
+void test_f48_dot_prod()
+{
+  cout<<"F48(SSE) dot product..." << endl;
+
+  // declaration
+  f48 * a = new f48[size];
+  f48 * b = new f48[size];
+  u64 start,stop,diff;
+  ofstream myfile;
+  
+  // initialisation
+  populate_array(a);
+  populate_array(b);
+  char path[256];
+  sprintf(path, "results/level1/%d/dot_prod_SSE_f48.txt", size);
+  myfile.open (path);
+
+  // run tests
+  for(int i=0; i<runs; i++) {
+    start = rdtsc();
+    dot_product_SSE_f48(a, b);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile<<diff<<endl;
+    // repopulate
+    populate_array(a);
+    populate_array(b);
+  }
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/dot_prod_SSE_f48.txt"<<endl;
+}
+
+      /** SCALE double **/
 void test_double_scale()
 {
-  cout<<"double scaling SSE..." << endl;
+  cout<<"DOUBLE(SSE) scale..." << endl;
+  // declaration
   double * a = new double[size];
-  srand(5);
-  double scalar = rand() % 1024;
-
-  populate_array(a);
-
-  u64 start;
-  u64 stop;
-  u64 diff;
+  double scalar;
+  u64 start,stop,diff;
   ofstream myfile;
-  myfile.open ("macneill_results/scale_SSE_double.txt");
+  
+  // initialisation
+  srand(5);
+  scalar = rand() % 1024;
+  populate_array(a);
+  char path[256];
+  sprintf(path, "results/level1/%d/scale_SSE_double.txt", size);
+  myfile.open (path);
 
-  for ( int i = 0; i < 100; i++ ) {
+  // run tests
+  for(int i=0; i<runs; i++) {
     start = rdtsc();
     scale_double_vector_SSE(a, scalar);
     stop = rdtsc();
     diff = stop - start;
     myfile<<diff<<endl;
-//     cout << diff << ",";
+    // repopulate
+    srand(5);
+    scalar = rand() % 1024;
+    populate_array(a);
   }
-  cout<<"Done. Results in macneill_results/scale_SSE_double.txt "<<endl;
-//   cout<<endl;
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/scale_SSE_double.txt"<<endl;
 }
 
-void test_max_f48_SSE()
+      /** SCALE f48 **/
+void test_f48_scale()
 {
-  cout<<"f48 max SSE" << endl;
-  cout<<"RDTSC diff" << endl;
+  cout<<"F48(SSE) scaling SSE..." << endl;
+
+  // declaration
   f48 * a = new f48[size];
-
-  populate_array(a);
-
-  u64 start;
-  f48 dot_prod;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 100; i++ ) {
-    start = rdtsc();
-    dot_prod = absolute_max_SSE_f48(a);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << diff << ',';
-  }
-  cout<<endl;
-}
-
-void test_min_f48_SSE()
-{
-  cout<<"f48 min SSE" << endl;
-  cout<<"RDTSC diff" << endl;
-  f48 * a = new f48[size];
-
-  populate_array(a);
-
-  u64 start;
-  f48 dot_prod;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 100; i++ ) {
-    start = rdtsc();
-    dot_prod = absolute_min_SSE_f48(a);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << diff << ',';
-  }
-  cout<<endl;
-}
-
-
-void test_max_double_SSE()
-{
-  cout<<"DOUBLE max SSE" << endl;
-  cout<<"RDTSC diff" << endl;
-  double * a = new double[size];
-
-  populate_array(a);
-
-  u64 start;
-  double dot_prod;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 100; i++ ) {
-    start = rdtsc();
-    dot_prod = absolute_max_SSE_double(a);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << diff << ',';
-  }
-}
-
-void test_min_double_SSE()
-{
-  cout<<"DOUBLE min SSE" << endl;
-  cout<<"RDTSC diff" << endl;
-  double * a = new double[size];
-
-  populate_array(a);
-
-  u64 start;
-  double dot_prod;
-  u64 stop;
-  u64 diff;
-
-  for ( int i = 0; i < 100; i++ ) {
-    start = rdtsc();
-    dot_prod = absolute_min_SSE_double(a);
-    stop = rdtsc();
-    diff = stop - start;
-    cout << diff << ',';
-  }
-}
-
-void test_magnitude_f48_SSE()
-{
-  cout<<"f48 magnitude SSE..." << endl;
-  f48 * a = new f48[size];
-
-  populate_array(a);
-
-  u64 start;
-  f48 dot_prod;
-  u64 stop;
-  u64 diff;
-  
-  // preparing file
+  f48 scalar;
+  u64 start, stop, diff;
   ofstream myfile;
-  myfile.open ("results/magnitude_SSE_f48.txt");
   
-  for ( int i = 0; i < 100; i++ ) {
+  // initialisation
+  populate_array(a);
+  srand(5);
+  scalar = f48(rand() % 1024);
+  char path[256];
+  sprintf(path, "results/level1/%d/scale_SSE_f48.txt", size);
+  myfile.open (path);
+
+  // run tests
+  for(int i=0; i<runs; i++) {
     start = rdtsc();
-    dot_prod = magnitude_SSE_f48(a);
+    scale_f48_vector_SSE(a, scalar);
     stop = rdtsc();
     diff = stop - start;
     myfile<<diff<<endl;
-//     cout << diff << ',';
+    // repopulate
+    populate_array(a);
+    srand(5);
+    scalar = f48(rand() % 1024);
   }
   myfile.close();
-  cout<<"Done. Results in results/magnitude_SSE_f48.txt "<<endl;
+  cout<<"Done. Results in results/level1/"<<size<<"/scale_SSE_f48.txt"<<endl;
+}
+
+      /** MAX double **/
+void test_max_double_SSE()
+{
+  cout<<"DOUBLE(SSE) absolute maximum..."<<endl;
+
+  // declaration
+  double * a = new double[size];
+  u64 start, stop, diff;
+  ofstream myfile;
+
+  // initialisation
+  populate_array(a);
+  char path[256];
+  sprintf(path, "results/level1/%d/max_SSE_double.txt", size);
+  myfile.open (path);
+
+  // run tests
+  for(int i=0; i<runs; i++) {
+    start = rdtsc();
+    absolute_max_SSE_double(a);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile<<diff<<endl;
+    // repopulate
+    populate_array(a);
+  }
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/max_SSE_double.txt"<<endl;
+}
+
+      /** MAX f48 **/
+void test_max_f48_SSE()
+{
+  cout<<"F48(SSE) absolute maximum..."<<endl;
+  // declaration
+  f48 * a = new f48[size];
+  u64 start, stop, diff;
+  ofstream myfile;
+
+  // initialisation
+  populate_array(a);
+char path[256];
+  sprintf(path, "results/level1/%d/max_SSE_f48.txt", size);
+  myfile.open (path);
+
+  // run tests
+  for(int i=0; i<runs; i++) {
+    start = rdtsc();
+    absolute_max_SSE_f48(a);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile<<diff<<endl;
+    // repopulate
+    populate_array(a);
+  }
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/max_SSE_f48.txt"<<endl;
+}
+
+      /** MIN double **/
+void test_min_double_SSE()
+{
+  cout<<"DOUBLE(SSE) absolute minimum..."<<endl;
+  // declaration
+  double * a = new double[size];
+  u64 start, stop, diff;
+  ofstream myfile;
+
+  // initialisation
+  populate_array(a);
+char path[256];
+  sprintf(path, "results/level1/%d/min_SSE_double.txt", size);
+  myfile.open (path);
+
+  // run tests
+  for(int i=0; i<runs; i++) {
+    start = rdtsc();
+    absolute_min_SSE_double(a);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile<<diff<<endl;
+    // repopulate
+    populate_array(a);
+  }
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/min_SSE_double.txt"<<endl;
+}
+
+      /** MIN f48 **/
+void test_min_f48_SSE()
+{
+  cout<<"F48(SSE) absolute minimum..."<<endl;
+  // declaration
+  f48 * a = new f48[size];
+  u64 start, stop, diff;
+  ofstream myfile;
+
+  // initialisation
+  populate_array(a);
+char path[256];
+  sprintf(path, "results/level1/%d/min_SSE_f48.txt", size);
+  myfile.open (path);
+
+  // run tests
+  for(int i=0; i<runs; i++) {
+    start = rdtsc();
+    absolute_min_SSE_f48(a);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile<<diff<<endl;
+    // repopulate
+    populate_array(a);
+  }
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/min_SSE_f48.txt"<<endl;
 }
 
 void test_magnitude_double_SSE()
 {
-  cout<<"DOUBLE magnitude SSE..." << endl;
+  cout<<"DOUBLE(SSE) magnitude..." << endl;
+  // declaration
   double * a = new double[size];
-
-  populate_array(a);
-
-  u64 start;
-  double dot_prod;
-  u64 stop;
-  u64 diff;
-  
-  // preparing file
+  u64 start, stop, diff;
   ofstream myfile;
-  myfile.open ("results/magnitude_SSE_double.txt");
+  
+  // initialisation
+  populate_array(a);
+  char path[256];
+  sprintf(path, "results/level1/%d/magnitude_SSE_double.txt", size);
+  myfile.open (path);
 
-  for ( int i = 0; i < 100; i++ ) {
+  // run tests
+  for(int i=0; i<runs; i++) {
     start = rdtsc();
-    dot_prod = magnitude_SSE_double(a);
+    magnitude_SSE_double(a);
     stop = rdtsc();
     diff = stop - start;
     myfile <<diff<<endl;
-//     cout << diff << ',';
+    // repopulate
+    populate_array(a);
   }
   myfile.close();
-  cout<<"Done. Results in results/magnitude_SSE_double.txt "<<endl;
+  cout<<"Done. Results in results/level1/"<<size<<"/magnitude_SSE_double.txt"<<endl;
 }
 
+      /** MAGNITUDE f48 **/
+void test_magnitude_f48_SSE()
+{
+  cout<<"F48(SSE) magnitude..." << endl;
+  // declaration
+  f48 * a = new f48[size];
+  u64 start, stop, diff;
+  ofstream myfile;
+
+  // initialisation
+  populate_array(a);
+  char path[256];
+  sprintf(path, "results/level1/%d/magnitude_SSE_f48.txt", size);
+  myfile.open (path);
+
+  // run tests  
+  for(int i=0; i<runs; i++) {
+    start = rdtsc();
+    magnitude_SSE_f48(a);
+    stop = rdtsc();
+    diff = stop - start;
+    myfile<<diff<<endl;
+    // repopulate
+    populate_array(a);
+  }
+  myfile.close();
+  cout<<"Done. Results in results/level1/"<<size<<"/magnitude_SSE_f48.txt"<<endl;
+}
+    /*** END LEVEL ***/
+
+
+    /*** LEVEL 2 ***/
+
+      /** MATRIX VECTOR MUL double **/
 void test_matrix_vector_mul_double_nonSSE()
 {
   cout<<"DOUBLE(NON-SSE) matrix-vector multiplication..." << endl;
   double* a = new double[size];
   double** matrix = new double*[size];
+  u64 start, stop, diff;
+
   populate_matrix(matrix);
   populate_array(a);
 
-  u64 start;
-  double dot_prod;
-  u64 stop;
-  u64 diff;
-  
   // preparing file
   ofstream outputfile;
-  outputfile.open ("results/level2/matrix_vector_mul_double_nonSSE.txt");
+  char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_double_nonSSE.txt", size);
+  outputfile.open (path);
 
-  for ( int i = 0; i < runs; i++ ) {
+  for(int i=0; i<runs; i++) {
     start = rdtsc();
     matrix_vector_mul_double(matrix,a);
     stop = rdtsc();
@@ -1298,7 +1182,7 @@ void test_matrix_vector_mul_double_nonSSE()
     populate_array(a);
   }
   outputfile.close();
-  cout<<"Done. Results in results/level2/matrix_vector_mul_double_nonSSE.txt"<<endl;
+  cout<<"Done. Results in results/level2/"<<size<<"/matrix_vector_mul_double_nonSSE.txt"<<endl;
 }
 
 void test_matrix_vector_mul_f48_nonSSE()
@@ -1315,7 +1199,9 @@ void test_matrix_vector_mul_f48_nonSSE()
   
   // preparing file
   ofstream outputfile;
-  outputfile.open ("results/level2/matrix_vector_mul_f48_nonSSE.txt");
+  char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_f48_nonSSE.txt", size);
+  outputfile.open (path);
 
   for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
@@ -1328,7 +1214,7 @@ void test_matrix_vector_mul_f48_nonSSE()
     populate_array(a);
   }
   outputfile.close();
-  cout<<"Done. Results in results/level2/matrix_vector_mul_f48_nonSSE.txt"<<endl;
+  cout<<"Done. Results in results/level2/"<<size<<"/matrix_vector_mul_f48_nonSSE.txt"<<endl;
 }
 
 void test_matrix_vector_mul_double_v1_SSE()
@@ -1346,7 +1232,9 @@ void test_matrix_vector_mul_double_v1_SSE()
   
   // preparing file
   ofstream outputfile;
-  outputfile.open ("results/level2/matrix_vector_mul_double_v1.txt");
+  char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_double_v1.txt", size);
+  outputfile.open (path);
 
   for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
@@ -1359,7 +1247,7 @@ void test_matrix_vector_mul_double_v1_SSE()
     populate_array(a);
   }
   outputfile.close();
-  cout<<"Done. Results in results/level2/matrix_vector_mul_double_v1.txt"<<endl;
+  cout<<"Done. Results in results/level2/"<<size<<"/matrix_vector_mul_double_v1.txt"<<endl;
 }
 
 void test_matrix_vector_mul_f48_v1_SSE() 
@@ -1376,7 +1264,9 @@ void test_matrix_vector_mul_f48_v1_SSE()
   
   // preparing file
   ofstream outputfile;
-  outputfile.open ("results/level2/matrix_vector_mul_f48_v1.txt");
+  char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_f48_v1.txt", size);
+  outputfile.open (path);
 
   for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
@@ -1389,7 +1279,7 @@ void test_matrix_vector_mul_f48_v1_SSE()
     populate_array(a);
   }
   outputfile.close();
-  cout<<"Done. Results in results/level2/matrix_vector_mul_f48_v1.txt"<<endl;
+  cout<<"Done. Results in results/level2/"<<size<<"/matrix_vector_mul_f48_v1.txt"<<endl;
 }
 
 void test_matrix_vector_mul_double_v2_SSE()
@@ -1407,7 +1297,9 @@ void test_matrix_vector_mul_double_v2_SSE()
   
   // preparing file
   ofstream outputfile;
-  outputfile.open ("results/level2/matrix_vector_mul_double_v2.txt");
+  char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_double_v2.txt", size);
+  outputfile.open (path);
 
   for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
@@ -1420,7 +1312,7 @@ void test_matrix_vector_mul_double_v2_SSE()
     populate_array(a);
   }
   outputfile.close();
-  cout<<"Done. Results in results/level2/matrix_vector_mul_double_v2.txt"<<endl;
+  cout<<"Done. Results in results/level2/"<<size<<"/matrix_vector_mul_double_v2.txt"<<endl;
 }
 
 void test_matrix_vector_mul_f48_v2_SSE()
@@ -1437,7 +1329,9 @@ void test_matrix_vector_mul_f48_v2_SSE()
   
   // preparing file
   ofstream outputfile;
-  outputfile.open ("results/level2/matrix_vector_mul_f48_v2.txt");
+    char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_f48_v2.txt", size);
+  outputfile.open (path);
 
   for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
@@ -1450,7 +1344,7 @@ void test_matrix_vector_mul_f48_v2_SSE()
     populate_array(a);
   }
   outputfile.close();
-  cout<<"Done. Results in results/level2/matrix_vector_mul_f48_v2.txt"<<endl;
+  cout<<"Done. Results in results/level2/"<<size<<"/matrix_vector_mul_f48_v2.txt"<<endl;
 }
 
 void test_matrix_vector_mul_f48_loopunroll_SSE()
@@ -1467,7 +1361,9 @@ void test_matrix_vector_mul_f48_loopunroll_SSE()
   
   // preparing file
   ofstream outputfile;
-  outputfile.open ("results/level2/matrix_vector_mul_f48_loopunroll.txt");
+    char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_f48_loopunroll.txt", size);
+  outputfile.open (path);
 
   for ( int i = 0; i < runs; i++ ) {
     start = rdtsc();
@@ -1480,10 +1376,182 @@ void test_matrix_vector_mul_f48_loopunroll_SSE()
     populate_array(a);
   }
   outputfile.close();
-  cout<<"Done. Results in results/level2/matrix_vector_mul_f48_loopunroll.txt"<<endl;
+  cout<<"Done. Results in results/level2/"<<size<<"/matrix_vector_mul_f48_loopunroll.txt"<<endl;
+}
+    /*** END LEVEL ***/
+
+    /*** LEVEL 3 ***/
+// TODO: REQUIRES IMPLEMENTATION OF MAT-MAT MUL! 
+
+
+/************ END TESTS ************/
+
+/************ REPORTS ************/
+
+    /*** LEVEL 1 REPORTS ***/
+void build_report_blas1()
+{
+  string double_dot_prod[runs];
+  string double_scale[runs];
+  string double_max[runs];
+  string double_min[runs];
+  string double_magnitude[runs];
+  string f48_dot_prod[runs];
+  string f48_scale[runs];
+  string f48_max[runs];
+  string f48_min[runs];
+  string f48_magnitude[runs];
+
+  string line;
+  char path[256];
+  sprintf(path, "results/level1/%d/dot_prod_SSE_double.txt", size);
+  ifstream test_double_dot_prod (path);
+  int i=0;// counter
+  if (test_double_dot_prod.is_open()) {
+    while(getline(test_double_dot_prod, line)){
+      double_dot_prod[i] = line;
+      i++;
+    }
+    test_double_dot_prod.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/dot_prod_SSE_double.txt)";
+  char path2[256];
+  sprintf(path2, "results/level1/%d/scale_SSE_double.txt", size);
+  ifstream test_double_scale (path2);
+  i=0;// counter
+  if (test_double_scale.is_open()) {
+    while(getline(test_double_scale, line)){
+      double_scale[i] = line;
+      i++;
+    }
+    test_double_scale.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/scale_SSE_double.txt)";
+  char path3[256];
+  sprintf(path3, "results/level1/%d/max_SSE_double.txt", size);
+  ifstream test_double_max (path3);
+  i=0;// counter
+  if (test_double_max.is_open()) {
+    while(getline(test_double_max, line)){
+      double_max[i] = line;
+      i++;
+    }
+    test_double_max.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/max_SSE_double.txt)";
+  char path4[256];
+  sprintf(path4, "results/level1/%d/min_SSE_double.txt", size);
+  ifstream test_double_min (path4);
+  i=0;// counter
+  if (test_double_min.is_open()) {
+    while(getline(test_double_min, line)){
+      double_min[i] = line;
+      i++;
+    }
+    test_double_min.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/min_SSE_double.txt)";
+  char path5[256];
+  sprintf(path5, "results/level1/%d/magnitude_SSE_double.txt", size);
+  ifstream test_double_magnitude (path5);
+  i=0;// counter
+  if (test_double_magnitude.is_open()) {
+    while(getline(test_double_magnitude, line)){
+      double_magnitude[i] = line;
+      i++;
+    }
+    test_double_magnitude.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/magnitude_SSE_double.txt)";
+  char path6[256];
+  sprintf(path6, "results/level1/%d/dot_prod_SSE_f48.txt", size);
+  ifstream test_f48_dot_prod (path6);
+  i=0;// counter
+  if (test_f48_dot_prod.is_open()) {
+    while(getline(test_f48_dot_prod, line)){
+      f48_dot_prod[i] = line;
+      i++;
+    }
+    test_f48_dot_prod.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/dot_prod_SSE_f48.txt)";
+  char path7[256];
+  sprintf(path7, "results/level1/%d/scale_SSE_f48.txt", size);
+  ifstream test_f48_scale (path7);
+  i=0;// counter
+  if (test_f48_scale.is_open()) {
+    while(getline(test_f48_scale, line)){
+      f48_scale[i] = line;
+      i++;
+    }
+    test_f48_scale.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/scale_SSE_f48.txt)";
+  char path8[256];
+  sprintf(path8, "results/level1/%d/max_SSE_f48.txt", size);
+  ifstream test_f48_max (path8);
+  i=0;// counter
+  if (test_f48_max.is_open()) {
+    while(getline(test_f48_max, line)){
+      f48_max[i] = line;
+      i++;
+    }
+    test_f48_max.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/max_SSE_f48.txt)";
+  char path9[256];
+  sprintf(path9, "results/level1/%d/min_SSE_f48.txt", size);
+  ifstream test_f48_min (path9);
+  i=0;// counter
+  if (test_f48_min.is_open()) {
+    while(getline(test_f48_min, line)){
+      f48_min[i] = line;
+      i++;
+    }
+    test_f48_min.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/min_SSE_f48.txt)";
+  char path10[256];
+  sprintf(path10, "results/level1/%d/magnitude_SSE_f48.txt", size);
+  ifstream test_f48_magnitude (path10);
+  i=0;// counter
+  if (test_f48_magnitude.is_open()) {
+    while(getline(test_f48_magnitude, line)){
+      f48_magnitude[i] = line;
+      i++;
+    }
+    test_f48_magnitude.close();
+  } else cout<<"ERROR: Unable to open file (results/level1/"<<size<<"/magnitude_SSE_f48.txt)";
+// all results loaded into memory - require structure of final report
+// report for dot prod with magnitude
+  ofstream dot_prod_mag_report;
+  sprintf(path, "results/level1/reports/%d/dot_product_and_magnitude.csv", size);
+  dot_prod_mag_report.open (path);
+  dot_prod_mag_report<<"Dot product,,Magnitude"<<endl;
+  dot_prod_mag_report<<"Double,F48,Double,F48"<<endl;
+  for(i=0; i<runs; i++){
+    dot_prod_mag_report<<double_dot_prod[i]<<","<<f48_dot_prod[i]<<","<<double_magnitude[i]<<","<<f48_magnitude[i]<<endl;
+  }
+  dot_prod_mag_report.close();
+  cout<<"Dot-product and magnitude report built sucessfully. (results/level1/reports/"<<size<<"/dot_product_and_magnitude.csv)"<<endl;
+// report for max with min
+  ofstream max_min_report;
+  sprintf(path2, "results/level1/reports/%d/maximum_and_minimum.csv", size);
+  max_min_report.open (path2);
+  max_min_report<<"Absolute Maximum,,Absolute Minimum"<<endl;
+  max_min_report<<"Double,F48,Double,F48"<<endl;
+  for(i=0; i<runs; i++){
+    max_min_report<<double_max[i]<<","<<f48_max[i]<<","<<double_min[i]<<","<<f48_min[i]<<endl;
+  }
+  max_min_report.close();
+  cout<<"Absolute maximum and absolute minimum report built sucessfully. (results/level1/reports/"<<size<<"/maximum_and_minimum.csv)"<<endl;
+// report for scale - one of the implemented BLAS L1 functions that makes changes to the vector itself
+  ofstream scale_report;
+  sprintf(path3, "results/level1/reports/%d/scale.csv", size);
+  scale_report.open (path3);
+  scale_report<<"Scale"<<endl;
+  scale_report<<"Double,F48,F48-Double"<<endl;
+  for(i=0; i<runs; i++){
+    scale_report<<double_scale[i]<<","<<f48_scale[i]<<endl;
+  }
+  scale_report.close();
+  cout<<"Scale report built sucessfully. (results/level1/reports/"<<size<<"/scale.csv)"<<endl;
+
+  cout<<"BLAS level 1 reports completed. (results/level1/reports/"<<size<<"/)"<<endl;
 }
 
-
+    /*** LEVEL 2 REPORTS ***/
 // FUNCTION REQUIRES TEST RESULTS FROM DOUBLE AND F48 IN THE PROPER FILES
 void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
 {
@@ -1499,7 +1567,9 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
   string line;
   
   // double results (nonsse, ssev1, ssev2)
-  ifstream test_nonSSE ("results/level2/matrix_vector_mul_double_nonSSE.txt");
+  char path[256];
+  sprintf(path, "results/level2/%d/matrix_vector_mul_double_nonSSE.txt", size);
+  ifstream test_nonSSE (path);
   int i=0;
   if (test_nonSSE.is_open())
   {
@@ -1509,9 +1579,10 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
       i++;
     }
     test_nonSSE.close();
-  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_double_nonSSE.txt)";
-  
-  ifstream test_SSEv1 ("results/level2/matrix_vector_mul_double_v1.txt");
+  } else cout << "ERROR: Unable to open file (results/level2/"<<size<<"/matrix_vector_mul_double_nonSSE.txt)";
+  char path2[256];
+  sprintf(path2, "results/level2/%d/matrix_vector_mul_double_v1.txt", size);
+  ifstream test_SSEv1 (path2);
   i=0; // reset count
   if (test_SSEv1.is_open())
   {
@@ -1521,9 +1592,9 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
       i++;
     }
     test_SSEv1.close();
-  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_double_v1.txt)"; 
-  
-  ifstream test_SSEv2 ("results/level2/matrix_vector_mul_double_v2.txt");
+  } else cout << "ERROR: Unable to open file (results/level2/"<<size<<"/matrix_vector_mul_double_v1.txt)"; 
+  sprintf(path2, "results/level2/%d/matrix_vector_mul_double_v2.txt", size);
+  ifstream test_SSEv2 (path2);
   i=0; // reset count
   if (test_SSEv2.is_open())
   {
@@ -1533,10 +1604,11 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
       i++;
     }
     test_SSEv2.close();
-  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_double_v2.txt)"; 
-  
+  } else cout << "ERROR: Unable to open file (results/level2/"<<size<<"/matrix_vector_mul_double_v2.txt)"; 
+    char path3[256];
+  sprintf(path3, "results/level2/%d/matrix_vector_mul_f48_nonSSE.txt", size);
   // f48 results (nonsse, ssev1, ssev2, sseloopunroll)
-  ifstream test_nonSSE_f48 ("results/level2/matrix_vector_mul_f48_nonSSE.txt");
+  ifstream test_nonSSE_f48 (path3);
   i=0;
   if (test_nonSSE_f48.is_open())
   {
@@ -1546,9 +1618,10 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
       i++;
     }
     test_nonSSE_f48.close();
-  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_nonSSE.txt)";
-  
-  ifstream test_SSEv1_f48 ("results/level2/matrix_vector_mul_f48_v1.txt");
+  } else cout << "ERROR: Unable to open file (results/level2/"<<size<<"/matrix_vector_mul_f48_nonSSE.txt)";
+  char path4[256];
+  sprintf(path4, "results/level2/%d/matrix_vector_mul_f48_v1.txt", size);
+  ifstream test_SSEv1_f48 (path4);
   i=0; // reset count
   if (test_SSEv1_f48.is_open())
   {
@@ -1558,9 +1631,10 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
       i++;
     }
     test_SSEv1_f48.close();
-  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_v1.txt)"; 
-  
-  ifstream test_SSEv2_f48 ("results/level2/matrix_vector_mul_f48_v2.txt");
+  } else cout << "ERROR: Unable to open file (results/level2/"<<size<<"/matrix_vector_mul_f48_v1.txt)"; 
+  char path5[256];
+  sprintf(path5, "results/level2/%d/matrix_vector_mul_f48_v2.txt", size);
+  ifstream test_SSEv2_f48 (path5);
   i=0; // reset count
   if (test_SSEv2_f48.is_open())
   {
@@ -1570,9 +1644,10 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
       i++;
     }
     test_SSEv2_f48.close();
-  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_v2.txt)"; 
-  
-  ifstream test_SSEloop_f48 ("results/level2/matrix_vector_mul_f48_loopunroll.txt");
+  } else cout << "ERROR: Unable to open file (results/level2/"<<size<<"/matrix_vector_mul_f48_v2.txt)"; 
+  char path6[256];
+  sprintf(path6, "results/level2/%d/matrix_vector_mul_f48_loopunroll.txt", size);
+  ifstream test_SSEloop_f48 (path6);
   i=0; // reset count
   if (test_SSEloop_f48.is_open())
   {
@@ -1582,12 +1657,13 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
       i++;
     }
     test_SSEloop_f48.close();
-  } else cout << "ERROR: Unable to open file (results/level2/matrix_vector_mul_f48_loopunroll.txt)"; 
+  } else cout << "ERROR: Unable to open file (results/level2/"<<size<<"/matrix_vector_mul_f48_loopunroll.txt)"; 
   
   
   
   ofstream myfile;
-  myfile.open ("results/level2/reports/matrix_vector_mul_report.csv");
+  sprintf(path, "results/level2/reports/%d/matrix_vector_mul_report.csv", size);
+  myfile.open (path);
   
   myfile<<"Matrix-vector Multiplication,,,,,,"<<endl;
   myfile<<"Double,,,F48,,,"<<endl;
@@ -1597,93 +1673,15 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
     myfile<<double_results_nonSSE[i]<<","<<double_results_SSEv1[i]<<","<<double_results_SSEv2[i]<<","<<f48_results_nonSSE[i]<<","<<f48_results_SSEv1[i]<<","<<f48_results_SSEv2[i]<<","<<f48_results_SSE_loopunroll[i]<<endl;
   }
   myfile.close();
-  cout<<"Matrix-vector multiplication results compiled for non-SSE,SSEv1,SSEv2. (results/level2/reports/matrix_vector_mul_report.txt)"<<endl;
+  cout<<"Matrix-vector multiplication results compiled for non-SSE,SSEv1,SSEv2. (results/level2/reports/"<<size<<"/matrix_vector_mul_report.txt)"<<endl;
 }
 
-void build_report_magnitude()
-{
-  cout<<"Compiling results in main magnitude report..."<<endl;
-  ofstream myfile;
-  myfile.open ("results/magnitude_report.txt");
-  
-  myfile<<"Magnitude test (f48 vs double)"<<endl;
-  myfile<<"SSE f48, SSE double"<<endl;
-  string results[100]; // TODO: use the test results number from global here!
-  string line;
-  ifstream mag_f48 ("results/magnitude_SSE_double.txt");
-  int i=0;
-  if (mag_f48.is_open())
-  {
-    while ( getline (mag_f48,line) )
-    {
-      results[i] = line;
-      i++;
-    }
-    mag_f48.close();
-  }
-  
-  ifstream mag_double ("results/magnitude_SSE_f48.txt");
-  i=0;
-  if (mag_double.is_open())
-  {
-    while ( getline (mag_double,line) )
-    {
-      myfile<<results[i]<<","<<line<<endl;
-      i++;
-    }
-    mag_double.close();
-  }
+    /*** LEVEL 3 REPORTS ***/
+  // TODO NEEDS ADDITION AFTER IMPLEMENTATION AND TESTS
 
-  else cout << "Unable to open file"; 
-
-  
-  myfile.close();
-  cout<<"Magnitude results compiled for f48 and double. (results/magnitude_report.txt)"<<endl;
-}
+/************ END REPORTS ************/
 
 
-void build_report_scaling() 
-{
-  cout<<"Compiling results in main scaling report..."<<endl;
-  ofstream myfile;
-  myfile.open ("macneill_results/scale_report.txt");
-  myfile<<"Scale test (f48 vs double)"<<endl;
-  myfile<<"SSE f48, SSE double"<<endl;
-  
-  string results[100]; // TODO: use the test results number from global here!
-  string line;
-  ifstream scale_f48 ("macneill_results/scale_SSE_double.txt");
-  int i=0;
-  if (scale_f48.is_open())
-  {
-    while ( getline (scale_f48,line) )
-    {
-      results[i] = line;
-      i++;
-    }
-    scale_f48.close();
-  }
-  
-  ifstream scale_double ("macneill_results/scale_SSE_f48.txt");
-  i=0;
-  if (scale_double.is_open())
-  {
-    while ( getline (scale_double,line) )
-    {
-      myfile<<results[i]<<","<<line<<endl;
-      i++;
-    }
-    scale_double.close();
-  }
-
-  else cout << "Unable to open file"; 
-
-  
-  myfile.close();
-  cout<<"Scale results compiled for f48 and double. (macneill_results/scale_report.txt)"<<endl;
-}
-
-// TODO: add number of runs for test results global
 /************* MAIN ***********************/
 
 int main(int argc, char* argv[])
@@ -1760,25 +1758,57 @@ int main(int argc, char* argv[])
 //  build_report_scaling();
  
 // TEST TEST TEST
-//  f48** matrix = new f48*[8];
+// f48** matrixa = new f48*[8];
 // for(int i = 0; i < 8; ++i){
-//     matrix[i] = new f48[8];
+//     matrixa[i] = new f48[8];
 // }
-// 
+
 // for(unsigned i=0;i<8;i++) {
 //     for(unsigned j=0;j<8;j++) {
-// 
-//         matrix[i][j] = f48(j);
+//         matrixa[i][j] = f48(j);
 //     }
 // }
-// 
-// 
+
+// f48** matrixb = new f48*[8];
+// for(int i = 0; i < 8; ++i){
+//     matrixb[i] = new f48[8];
+// }
+
 // for(unsigned i=0;i<8;i++) {
 //     for(unsigned j=0;j<8;j++) {
-//         cout<<(double)matrix[i][j]<<"\t";
+//         matrixb[i][j] = f48(j);
+//     }
+// }
+
+// cout<<endl<<"MATRIX A"<<endl; 
+// for(unsigned i=0;i<8;i++) {
+//     for(unsigned j=0;j<8;j++) {
+//         cout<<double(matrixa[i][j])<<"\t";
 //     }
 //     cout<<endl;
 // }
+
+// cout<<endl<<"MATRIX B"<<endl;
+
+// for(unsigned i=0;i<8;i++) {
+//     for(unsigned j=0;j<8;j++) {
+//         cout<<double(matrixb[i][j])<<"\t";
+//     }
+//     cout<<endl;
+// }
+
+// matrixa = matrix_matrix_mul_f48(matrixa,matrixb); 
+
+// cout<<endl<<"RESULT!!!!"<<endl;
+// for(unsigned i=0;i<8;i++) {
+//     for(unsigned j=0;j<8;j++) {
+//         cout<<double(matrixa[i][j])<<"\t";
+//     }
+//     cout<<endl;
+// }
+
+
+
 // 
 // f48* vector = new f48[8];
 // for(unsigned i=0;i<8;i++){
@@ -1834,74 +1864,260 @@ cout<<"V2-V1: "<<v2-v1<<endl;*/
 
 // int test;
 // cin>>test;
+cout<<"Creating folder structure required"<<endl;
+char mkcmd[256];
+char dirpath[80] = "./results/level1/reports";
+sprintf(mkcmd, "mkdir -p %s", dirpath);
+int res = system(mkcmd);
+if(res<0){
+  cout<<"ERROR occured in creating folder structure.";
+  return -1;
+}
+char dirpathtwo[80] = "./results/level2/reports";
+sprintf(mkcmd, "mkdir -p %s", dirpathtwo);
+res = system(mkcmd);
+if(res<0){
+  cout<<"ERROR occured in creating folder structure.";
+  return -1;
+}
+char dirpaththree[80] = "./results/level3/reports";
+sprintf(mkcmd, "mkdir -p %s", dirpaththree);
+res = system(mkcmd);
+if(res<0){
+  cout<<"ERROR occured in creating folder structure.";
+  return -1;
+}
 
-
+// TESTING MENU!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 int option=0;
 int inneroption=0;
 do { 
+  cout << "Size selected is: "<<size<<endl;
+  cout << "Number of runs for each test is: "<<runs<<endl;
   cout << "1) BLAS level 1" << endl;
   cout << "2) BLAS level 2" << endl;
   cout << "3) BLAS level 3" << endl;
-  cout << "4) Exit " << endl;
+  cout << "4) Change size" << endl;
+  cout << "5) Change number of runs" << endl;
+  cout << "6) Exit " << endl;
   //Prompting user to enter an option according to menu
   cout << "Please select an option: ";
   cin >> option;  // taking option value as input and saving in variable "option"
+  char *path = (char *)"";
   
   switch(option) {
     case 1: cout<<"BLAS LEVEL 1 SELECTED!"<<endl;
+      do{
+        cout << "1) Double tests" << endl;
+        cout << "2) F48 tests" << endl;
+        cout << "3) Build comparison reports" << endl;
+        cout << "4) Back " << endl;
+        cout << "Please select an option: ";
+        cin >> inneroption;  // taking option value as input and saving in variable "option"
+        switch(inneroption) {
+          case 1: 
+            cout<<"Creating folder structure"<<endl;
+            path = (char *)"./results/level1/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+            path = (char *)"./results/level1/reports/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+            cout<<"Running dot-prod, scale, max/min, magnitude tests on doubles"<<endl;
+            test_double_dot_prod();
+            cout<<endl;
+            test_double_scale();
+            cout<<endl;
+            test_max_double_SSE();
+            cout<<endl;
+            test_min_double_SSE();
+            cout<<endl;
+            test_magnitude_double_SSE();
+            cout<<endl;
+            break;
+          case 2:
+            cout<<"Creating folder structure"<<endl;
+            path = (char *)"./results/level1/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+            path = (char *)"./results/level1/reports/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+            cout<<"Running dot-prod, scale, max/min, magnitude tests on f48"<<endl;
+            test_f48_dot_prod();
+            cout<<endl;
+            test_f48_scale();
+            cout<<endl;
+            test_max_f48_SSE();
+            cout<<endl;
+            test_min_f48_SSE();
+            cout<<endl;
+            test_magnitude_f48_SSE();
+            cout<<endl;
+            break;
+          case 3: 
+            cout<<"Creating folder structure"<<endl;
+            path = (char *)"./results/level1/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+            path = (char *)"./results/level1/reports/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+            cout<<"Compiling results in the BLAS level 1 report... "<<endl;
+            build_report_blas1(); // TODO - implement report gen
+            cout<<endl;
+            break;
+          case 4: cout<<"Going back to main menu"<<endl<<endl;
+            break;
+          default: cout<<"try again";
+            break;
+        }
+      }while(inneroption != 4);
       break;
     case 2: 
       cout<<endl<<"BLAS LEVEL 2 SELECTED"<<endl;
       do{
-	cout << "1) Double tests" << endl;
-	cout << "2) F48 tests" << endl;
-	cout << "3) Build comparison report" << endl;
-	cout << "4) Back " << endl;
-	cout << "Please select an option: ";
-	cin >> inneroption;  // taking option value as input and saving in variable "option"
-	 switch(inneroption) {
-	   case 1:
-	     cout<<endl<<"Running matrix-vector tests on doubles"<<endl;
-	     test_matrix_vector_mul_double_nonSSE();
-	     cout<<endl;
-	     test_matrix_vector_mul_double_v1_SSE();
-	     cout<<endl;
-	     test_matrix_vector_mul_double_v2_SSE();
-	     cout<<endl;
-	     break;
-	   case 2:
-	     cout<<endl<<"Running matrix-vector tests on f48"<<endl;
-	     test_matrix_vector_mul_f48_nonSSE();
-	     cout<<endl;
-	     test_matrix_vector_mul_f48_v1_SSE();
-	     cout<<endl;
-	     test_matrix_vector_mul_f48_v2_SSE();
-	     cout<<endl;
-	     test_matrix_vector_mul_f48_loopunroll_SSE();
-	     cout<<endl;
-	     break;
-	   case 3:
-	     cout<<endl<<"Compiling results in matrix-vector multiplication report..."<<endl;
-	     build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48();
-	     cout<<endl;
-	     break;
-	   case 4: cout<<"going back to main menu"<<endl<<endl;
-	     break;
-	   default: cout<<"try again";
-	     break;
-	 }
+      	cout << "1) Double tests" << endl;
+      	cout << "2) F48 tests" << endl;
+      	cout << "3) Build comparison report" << endl;
+      	cout << "4) Back " << endl;
+      	cout << "Please select an option: ";
+      	cin >> inneroption;  // taking option value as input and saving in variable "option"
+      	 switch(inneroption) {
+      	   case 1:
+            cout<<"Creating folder structure"<<endl;
+            path = (char *)"./results/level2/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+            path = (char *)"./results/level2/reports/";
+            sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+            res = system(mkcmd);
+            if(res<0){
+              cout<<"ERROR occured in creating folder structure.";
+              return -1;
+            }
+      	     cout<<endl<<"Running matrix-vector tests on doubles"<<endl;
+              test_matrix_vector_mul_double_nonSSE();       	     
+      	     cout<<endl;
+      	     test_matrix_vector_mul_double_v1_SSE();
+      	     cout<<endl;
+      	     test_matrix_vector_mul_double_v2_SSE();
+      	     cout<<endl;
+      	     break;
+      	   case 2:
+              cout<<"Creating folder structure"<<endl;
+              path = (char *)"./results/level2/";
+              sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+              res = system(mkcmd);
+              if(res<0){
+                cout<<"ERROR occured in creating folder structure.";
+                return -1;
+              }
+              path = (char *)"./results/level2/reports/";
+              sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+              res = system(mkcmd);
+              if(res<0){
+                cout<<"ERROR occured in creating folder structure.";
+                return -1;
+              }  
+      	     cout<<endl<<"Running matrix-vector tests on f48"<<endl;
+             test_matrix_vector_mul_f48_nonSSE(); 
+      	     cout<<endl;
+      	     test_matrix_vector_mul_f48_v1_SSE();
+      	     cout<<endl;
+      	     test_matrix_vector_mul_f48_v2_SSE();
+      	     cout<<endl;
+      	     test_matrix_vector_mul_f48_loopunroll_SSE();
+      	     cout<<endl;
+      	     break;
+      	   case 3:
+              cout<<"Creating folder structure"<<endl;
+              path = (char *)"./results/level2/";
+              sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+              res = system(mkcmd);
+              if(res<0){
+                cout<<"ERROR occured in creating folder structure.";
+                return -1;
+              }
+              path = (char *)"./results/level2/reports/";
+              sprintf(mkcmd, "mkdir -p %s/%d", path,size);
+              res = system(mkcmd);
+              if(res<0){
+                cout<<"ERROR occured in creating folder structure.";
+                return -1;
+              }
+      	     cout<<endl<<"Compiling results in matrix-vector multiplication report..."<<endl;
+      	     build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48();
+      	     cout<<endl;
+      	     break;
+      	   case 4: cout<<"Going back to main menu"<<endl<<endl;
+      	     break;
+      	   default: cout<<"try again";
+      	     break;
+      	 }
       }while(inneroption != 4);
       break;
-    case 3: cout<<"BLAS LEVEL 3 SELECTED!"<<endl;
+    case 3: 
+      cout<<"BLAS LEVEL 3 SELECTED!"<<endl;
       break;
-    case 4: cout<<"Exiting program"<<endl;
+    case 4: 
+      cout<<"Enter the new value of the size (current size: "<<size<<", enter 0 (or<0) to keep the current value"<<endl;
+      int temp_size;
+      cin >> temp_size;
+      if(temp_size>0) {
+        size = temp_size;
+        cout<<"Size sucessfully changed to: "<<size<<endl;
+      } else {
+        cout<<"New size negative or 0 not accepted - current size remains the same ("<<size<<")"<<endl;
+      }
+      break;
+    case 5:
+      cout<<"Enter the number of runs (current number of runs: "<<runs<<", enter 0 (or<0) to keep the current value"<<endl;
+      int temp_runs;
+      cin>>temp_runs;
+      if(temp_runs>0){
+        runs = temp_runs;
+        cout<<"Number of runs changed to: "<<runs<<endl;
+      } else {
+        cout<<"New number of runs negative or 0 not accepted - current number of runs remains the same ("<<runs<<")"<<endl;
+      }
+      break;
+    case 6: cout<<"Exiting program"<<endl;
       return 0;
       break;
     default: cout<<"Unknown option, please try again!"<<endl;
       break;
   }
 
-} while(option != 4);
+} while(option != 6);
 
 
 
