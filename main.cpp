@@ -311,7 +311,10 @@ double dot_product_SSE_double (double *a, double *b) {
 		 temp_vect = _mm_mul_pd(a_vec, b_vec);
 		 result_vec = _mm_add_pd(temp_vect, result_vec);  //performs vertical addition
 	}
-	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
+  __m128i mask_hadd = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+                        15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i result_shuffled = _mm_shuffle_epi8((__m128i)result_vec, mask_hadd);
+	result_vec = _mm_add_pd((__m128d)result_shuffled, result_vec); // cumulate result
 	// store result into double
 // 	_mm_store1_pd(&total, result_vec);
 	_mm_store_sd(&total, result_vec);
@@ -321,7 +324,6 @@ double dot_product_SSE_double (double *a, double *b) {
 f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
-	__m128d temp_vect;
 	__m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 					5, 4, 3, 2, 1, 0, 255, 255);
 
@@ -330,10 +332,15 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 		a_vec = _mm_shuffle_epi8(a_vec, mask);
 		__m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
 		b_vec = _mm_shuffle_epi8(b_vec, mask);
-		 temp_vect = _mm_mul_pd((__m128d)a_vec, (__m128d)b_vec);
-		 result_vec = _mm_add_pd(temp_vect, result_vec);  //performs vertical addition
+		a_vec = (__m128i)_mm_mul_pd((__m128d)a_vec, (__m128d)b_vec);
+		result_vec = _mm_add_pd((__m128d)a_vec, result_vec);  //performs vertical addition
 	}
-	result_vec = _mm_hadd_pd(result_vec, result_vec); // cumulate result
+  __m128i mask_hadd = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+          15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i result_shuffled = _mm_shuffle_epi8((__m128i)result_vec, mask_hadd);
+	result_vec = _mm_add_pd((__m128d)result_shuffled, result_vec); // cumulate result
+  //TODO: instead of hadd try permute and add!!!
+
 // 	_mm_store1_pd(&total, result_vec);
 	_mm_store_sd(&total, result_vec); 
 	f48 total_result (total);
@@ -430,7 +437,10 @@ f48 magnitude_SSE_f48 (f48 *a){
    a_vect = (__m128i)_mm_mul_pd((__m128d)a_vect,(__m128d)a_vect); // ^2
    result_vec = _mm_add_pd(result_vec, (__m128d)a_vect); // running sum
   }
-  result_vec = _mm_hadd_pd(result_vec, result_vec);
+  __m128i mask_hadd = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+          15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i result_shuffled = _mm_shuffle_epi8((__m128i)result_vec, mask_hadd);
+  result_vec = _mm_add_pd((__m128d)result_shuffled, result_vec);
   result_vec = _mm_sqrt_pd(result_vec);
   double res=0;
 //   _mm_store1_pd(&res, result_vec);
@@ -445,7 +455,10 @@ double magnitude_SSE_double (double *a){
     a_vect = _mm_mul_pd(a_vect, a_vect); // ^2
     result_vec = _mm_add_pd(result_vec, a_vect); // running sum
   }
-  result_vec = _mm_hadd_pd(result_vec, result_vec);
+  __m128i mask_hadd = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+          15, 14, 13, 12, 11, 10, 9, 8);
+  __m128i result_shuffled = _mm_shuffle_epi8((__m128i)result_vec, mask_hadd);
+  result_vec = _mm_add_pd((__m128d)result_shuffled, result_vec);
   result_vec = _mm_sqrt_pd(result_vec);
   double res=0;
 //   _mm_store1_pd(&res, result_vec);
@@ -822,17 +835,81 @@ f48** matrix_matrix_mul_f48(f48** a, f48** b) {
   return res;
 }
 
-      /** MATRIX MATRIX MUL double SSE **/
-double** matrix_matrix_mul_double_SSE() {
-  double** res = new double*[8];
-  for(int i=0; i<8; i++) {
-    res[i] = new double[8];
-  }
+// implement the naive method
+// then implement a locality improved method
 
-  // do magic here
+      /** MATRIX MATRIX MUL double SSE **/
+double** matrix_matrix_mul_double_SSE(double** a, double** b) {
+  double** res = new double*[4];
+  for(int i=0; i<4; i++) {
+    res[i] = new double[4];
+  }
+  for(int i=0; i<4; i++){
+    __m128d sum[4]; // size
+    for(int x=0;x<4;x++){ // initialisation of final sum
+      sum[x] = _mm_setzero_pd();
+    }
+    for(int j=0; j<4; j+=2){
+      for(int offset=0; offset<4; offset+=2){
+        __m128d elemA = _mm_load_pd(&a[i][j]);
+        __m128d elemb1 = _mm_load_pd(&b[j][offset]);
+        __m128d elemb2 = _mm_load_pd(&b[j+1][offset]);
+
+        __m128i mask = _mm_set_epi8(255, 255, 255, 255, 255, 255, 255, 255,          
+                7 ,6 ,5, 4, 3, 2, 1, 0);
+        __m128d temp = (__m128d)_mm_shuffle_epi8((__m128i)elemb1, mask);
+        mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+            255, 255, 255, 255, 255, 255, 255, 255);
+        __m128d temp2 = (__m128d)_mm_shuffle_epi8((__m128i)elemb2, mask);
+        __m128d ae = (__m128d)_mm_or_si128((__m128i)temp,(__m128i)temp2);
+        mask = _mm_set_epi8(255, 255, 255, 255, 255, 255, 255, 255,          
+                        15,14,13, 12, 11, 10, 9, 8);
+        temp = (__m128d)_mm_shuffle_epi8((__m128i)elemb1, mask);
+        mask = _mm_set_epi8(15,14,13, 12, 11, 10, 9, 8,          
+                        255, 255, 255, 255, 255, 255, 255, 255);
+        temp2 = (__m128d)_mm_shuffle_epi8((__m128i)elemb2, mask);
+        __m128d bf = (__m128d)_mm_or_si128((__m128i)temp,(__m128i)temp2);
+        // multiplication
+        double* test1 = new double[2];
+        double* test2 = new double[2];
+        double* test3 = new double[2];
+        _mm_store_pd(&test2[0], bf);
+        _mm_store_pd(&test1[0], ae);
+        _mm_store_pd(&test3[0], elemA);
+
+        ae = _mm_mul_pd(ae, elemA);
+        bf = _mm_mul_pd(bf, elemA);
+        // add to running sum
+        sum[offset] = _mm_add_pd(sum[offset],ae);
+        sum[offset+1] = _mm_add_pd(sum[offset+1],bf);
+      }
+    }
+    for(int x=0;x<4;x++){
+      // hadd
+      __m128i mask_hadd = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
+                        15, 14, 13, 12, 11, 10, 9, 8);
+      __m128d sum_shuffled= (__m128d)_mm_shuffle_epi8((__m128i)sum[x], mask_hadd);
+      sum[x] = _mm_add_pd(sum[x],sum_shuffled);
+      _mm_store_sd(&res[i][x], sum[x]);
+      sum[x] = _mm_setzero_pd(); // reset running sums
+    }
+
+  }
 
   return res;
 }
+
+// void gemm4x4_SSE(double **A, double **B, double **C) {
+//     __m128 row[4], sum[4];
+//     for(int i=0; i<4; i++)  row[i] = _mm_load_pd(&B[i*4]);
+//     for(int i=0; i<4; i++) {
+//         sum[i] = _mm_setzero_pd();      
+//         for(int j=0; j<4; j++) {
+//             sum[i] = _mm_add_pd(_mm_mul_pd(_mm_set1_pd(A[i*4+j]), row[j]), sum[i]);
+//         }           
+//     }
+//     for(int i=0; i<4; i++) _mm_store_pd(&C[i*4], sum[i]); 
+// }
 
     /*** END LEVEL 3 ***/
 
@@ -1518,7 +1595,7 @@ void build_report_blas1()
   ofstream dot_prod_mag_report;
   sprintf(path, "results/level1/reports/%d/dot_product_and_magnitude.csv", size);
   dot_prod_mag_report.open (path);
-  dot_prod_mag_report<<"Dot product,,Magnitude"<<endl;
+  dot_prod_mag_report<<"Dot product (size:"<<size<<"),,Magnitude"<<endl;
   dot_prod_mag_report<<"Double,F48,Double,F48"<<endl;
   for(i=0; i<runs; i++){
     dot_prod_mag_report<<double_dot_prod[i]<<","<<f48_dot_prod[i]<<","<<double_magnitude[i]<<","<<f48_magnitude[i]<<endl;
@@ -1529,7 +1606,7 @@ void build_report_blas1()
   ofstream max_min_report;
   sprintf(path2, "results/level1/reports/%d/maximum_and_minimum.csv", size);
   max_min_report.open (path2);
-  max_min_report<<"Absolute Maximum,,Absolute Minimum"<<endl;
+  max_min_report<<"Absolute Maximum(size:"<<size<<"),,Absolute Minimum"<<endl;
   max_min_report<<"Double,F48,Double,F48"<<endl;
   for(i=0; i<runs; i++){
     max_min_report<<double_max[i]<<","<<f48_max[i]<<","<<double_min[i]<<","<<f48_min[i]<<endl;
@@ -1540,7 +1617,7 @@ void build_report_blas1()
   ofstream scale_report;
   sprintf(path3, "results/level1/reports/%d/scale.csv", size);
   scale_report.open (path3);
-  scale_report<<"Scale"<<endl;
+  scale_report<<"Scale(size:"<<size<<")"<<endl;
   scale_report<<"Double,F48,F48-Double"<<endl;
   for(i=0; i<runs; i++){
     scale_report<<double_scale[i]<<","<<f48_scale[i]<<endl;
@@ -1665,7 +1742,7 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
   sprintf(path, "results/level2/reports/%d/matrix_vector_mul_report.csv", size);
   myfile.open (path);
   
-  myfile<<"Matrix-vector Multiplication,,,,,,"<<endl;
+  myfile<<"Matrix-vector Multiplication (size:"<<size<<"),,,,,,"<<endl;
   myfile<<"Double,,,F48,,,"<<endl;
   myfile<<"non-SSE,SSE-v1,SSE-v2,non-SSE,SSE-v1,SSE-v2,SSE-loop un-rolled"<<endl;
   // TODO: refactor to new structure ^^
@@ -1687,14 +1764,18 @@ void build_report_matrix_vector_v1_v2_nonSSE_double_vs_f48()
 int main(int argc, char* argv[])
 {
 
-
-
 //  u48 dummy48u;
 //  u64 dummy64u;
-
 //  double dummy64d;
 //
 //  test_type(dummy48u, "u48     ");
+
+
+
+// << Te iubesc pisica! <3 
+
+
+
 //  test_type(dummy64u, "u64     ");
 //  test_u48_vec();
 //  test_type(dummy64d, "f64     ");
@@ -1758,31 +1839,46 @@ int main(int argc, char* argv[])
 //  build_report_scaling();
  
 // TEST TEST TEST
-// f48** matrixa = new f48*[8];
-// for(int i = 0; i < 8; ++i){
-//     matrixa[i] = new f48[8];
+// double** matrixa = new double*[4];
+// for(int i = 0; i < 4; ++i) {
+//     matrixa[i] = new double[4];
 // }
-
-// for(unsigned i=0;i<8;i++) {
-//     for(unsigned j=0;j<8;j++) {
-//         matrixa[i][j] = f48(j);
+// int count = 1;
+// for(unsigned i=0;i<4;i++) {
+//     for(unsigned j=0;j<4;j++) {
+//         matrixa[i][j] = count;
+//         count++;
 //     }
 // }
 
-// f48** matrixb = new f48*[8];
-// for(int i = 0; i < 8; ++i){
-//     matrixb[i] = new f48[8];
+
+// double** matrixb = new double*[4];
+// for(int i = 0; i < 4; ++i){
+//     matrixb[i] = new double[4];
 // }
 
-// for(unsigned i=0;i<8;i++) {
-//     for(unsigned j=0;j<8;j++) {
-//         matrixb[i][j] = f48(j);
+// count = 1;
+// for(unsigned i=0;i<4;i++) {
+//     for(unsigned j=0;j<4;j++) {
+//         matrixb[i][j] = count;
+//         count++;
+//     }
+// }
+
+// double** matrixc = new double*[4];
+// for(int i = 0; i < 4; ++i){
+//     matrixc[i] = new double[4];
+// }
+
+// for(unsigned i=0;i<4;i++) {
+//     for(unsigned j=0;j<4;j++) {
+//         matrixc[i][j] = j;
 //     }
 // }
 
 // cout<<endl<<"MATRIX A"<<endl; 
-// for(unsigned i=0;i<8;i++) {
-//     for(unsigned j=0;j<8;j++) {
+// for(unsigned i=0;i<4;i++) {
+//     for(unsigned j=0;j<4;j++) {
 //         cout<<double(matrixa[i][j])<<"\t";
 //     }
 //     cout<<endl;
@@ -1790,19 +1886,19 @@ int main(int argc, char* argv[])
 
 // cout<<endl<<"MATRIX B"<<endl;
 
-// for(unsigned i=0;i<8;i++) {
-//     for(unsigned j=0;j<8;j++) {
+// for(unsigned i=0;i<4;i++) {
+//     for(unsigned j=0;j<4;j++) {
 //         cout<<double(matrixb[i][j])<<"\t";
 //     }
 //     cout<<endl;
 // }
 
-// matrixa = matrix_matrix_mul_f48(matrixa,matrixb); 
+// matrixc = matrix_matrix_mul_double_SSE(matrixa,matrixb); 
 
-// cout<<endl<<"RESULT!!!!"<<endl;
-// for(unsigned i=0;i<8;i++) {
-//     for(unsigned j=0;j<8;j++) {
-//         cout<<double(matrixa[i][j])<<"\t";
+// cout<<endl<<"RESULT"<<endl;
+// for(unsigned i=0;i<4;i++) {
+//     for(unsigned j=0;j<4;j++) {
+//         cout<<double(matrixc[i][j])<<"\t";
 //     }
 //     cout<<endl;
 // }
@@ -1862,8 +1958,9 @@ cout<<"V1: "<<v1<<endl;
 cout<<"V2: "<<v2<<endl;
 cout<<"V2-V1: "<<v2-v1<<endl;*/
 
-// int test;
-// cin>>test;
+
+
+// UNCOMMMEEEENT HERE FOR MENU AND FOLDER STRUCTURE!!!
 cout<<"Creating folder structure required"<<endl;
 char mkcmd[256];
 char dirpath[80] = "./results/level1/reports";
