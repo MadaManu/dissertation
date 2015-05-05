@@ -1,0 +1,32 @@
+
+dot_prod_SSE_double.txt
+2100.000000	22
+
+dot_prod_SSE_f48.txt
+8600.000000	22
+
+magnitude_SSE_double.txt
+2100.000000	23
+
+magnitude_SSE_f48.txt
+6400.000000	23
+
+max_SSE_double.txt
+2100.000000	24
+
+max_SSE_f48.txt
+8400.000000	23
+
+min_SSE_double.txt
+2100.000000	24
+
+min_SSE_f48.txt
+8400.000000	23
+
+scale_SSE_double.txt
+4600.000000	17
+4700.000000	5
+
+scale_SSE_f48.txt
+13500.000000	18
+13600.000000	5
