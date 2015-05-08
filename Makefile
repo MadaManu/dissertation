@@ -39,12 +39,18 @@ draw-pcm-1: results/level1/$(SIZE)
 
 draw-pcm-2: results/level2/$(SIZE)
 	cd results/level2/$(SIZE)/ ; \
-	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 20 0 1000000 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 20 0 1000000 > $$x.dat; done ; \
+	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 6000 0 1000000 > $$x.stats; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 6000 0 1000000 > $$x.dat; done ; \
 	OUTPUT=level2.pdf $(KDE_SH) *.dat
 
 draw-pcm-3: results/level3/$(SIZE)
 	cd results/level3/$(SIZE)/ ; \
-	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 20 0 1000000000 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 20 0 1000000000 > $$x.dat; done ; \
+	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 300000 0 1000000000 > $$x.stats; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 300000 0 1000000000 > $$x.dat; done ; \
 	OUTPUT=level3.pdf $(KDE_SH) *.dat
+
+draw-pcm-3-sse: results/level3/$(SIZE)
+	cd results/level3/$(SIZE)/ ; \
+	for x in `ls *SSE*cycles.txt`; do $(STATS_EXE) $$x 100 100 0 3000 > $$x.stats; done ; \
+	for x in `ls *SSE*cycles.txt`; do $(HIST_EXE) $$x 100 100 0 3000 > $$x.dat; done ; \
+	OUTPUT=level3-SSE.pdf $(KDE_SH) *SSE*.dat
