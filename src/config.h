@@ -3,6 +3,7 @@
 struct stat st = {0};
 
 int size = 256;
+char sizestr[256];
 int runs = 100;
 
 typedef unsigned long long u64;

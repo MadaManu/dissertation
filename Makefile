@@ -22,3 +22,4 @@ clean:
 
 run-pcm: dist/main-pcm
 	sudo numactl --physcpubind=$(CORE) nice -20 ./dist/main-pcm
+	sudo chown -R $(USER):users results
