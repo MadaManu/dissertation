@@ -47,10 +47,7 @@ void test_2ptr(T, string message, string resultsdir, string filename, string pcm
 
   char mkcmd[256];
   sprintf(mkcmd, "mkdir -p %s/", resultsdir.c_str());
-  if( system(mkcmd) < 0 ){
-    cout << "ERROR occured making folder: " << resultsdir;
-    exit(1);
-  }
+  system(mkcmd);
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
@@ -122,10 +119,7 @@ void test_ptr_scalar(T, string message, string resultsdir, string filename, stri
 
   char mkcmd[256];
   sprintf(mkcmd, "mkdir -p %s/", resultsdir.c_str());
-  if( system(mkcmd) < 0 ){
-    cout << "ERROR occured making folder: " << resultsdir;
-    exit(1);
-  }
+  system(mkcmd);
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
@@ -193,10 +187,7 @@ void test_ptr(T, string message, string resultsdir, string filename, string pcmf
 
   char mkcmd[256];
   sprintf(mkcmd, "mkdir -p %s/", resultsdir.c_str());
-  if( system(mkcmd) < 0 ){
-    cout << "ERROR occured making folder: " << resultsdir;
-    exit(1);
-  }
+  system(mkcmd);
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
@@ -266,10 +257,7 @@ void test_mat_vec(T, string message, string resultsdir, string filename, string 
 
   char mkcmd[256];
   sprintf(mkcmd, "mkdir -p %s/", resultsdir.c_str());
-  if( system(mkcmd) < 0 ){
-    cout << "ERROR occured making folder: " << resultsdir;
-    exit(1);
-  }
+  system(mkcmd);
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
@@ -339,10 +327,7 @@ void test_mat_mat(T, string message, string resultsdir, string filename, string 
 
   char mkcmd[256];
   sprintf(mkcmd, "mkdir -p %s/", resultsdir.c_str());
-  if( system(mkcmd) < 0 ){
-    cout << "ERROR occured making folder: " << resultsdir;
-    exit(1);
-  }
+  system(mkcmd);
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;

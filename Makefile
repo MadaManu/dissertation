@@ -1,7 +1,6 @@
 LIBS_PATH=/home/andrew/PhD/code/measurement/src/c/
 PCM_PATH=/home/andrew/Downloads/IntelPerformanceCounterMonitorV2.8
 CORE=0
-SIZE=256
 STATS_EXE=/home/andrew/PhD/code/measurement/dist/statistics
 HIST_EXE=/home/andrew/PhD/code/measurement/dist/histogram
 KDE_SH=/home/andrew/PhD/code/measurement/src/sh/kde.sh
@@ -28,6 +27,7 @@ stats-clean:
 	@ rm -rf results/*/*/*.dat results/*/*/*.stats results/*/*/*.pdf
 
 run-pcm: dist/main-pcm
+	sudo modprobe msr
 	sudo numactl --physcpubind=$(CORE) nice -20 ./dist/main-pcm
 	sudo chown -R $(USER):users results
 

@@ -60,16 +60,18 @@ int main()
   // matrix-vector mul SSE v1
   test_mat_vec(dummyDouble,    "DOUBLE(SSE) matrix_vector_mul ...", l2path+"/"+sizestr, "matrix-vector-mul-SSE-double", "matrix-vector-mul-SSE-double-pcm", &matrix_vector_mul_SSE_double);
   test_mat_vec(dummyf48,       "f48(SSE) matrix_vector_mul ...",    l2path+"/"+sizestr, "matrix-vector-mul-SSE-f48",    "matrix-vector-mul-SSE-f48-pcm",    &matrix_vector_mul_SSE_f48);
+  // matrix-vector mul SSE unrolled
+  test_mat_vec(dummyf48,       "f48(SSE unrolled) matrix_vector_mul ...",    l2path+"/"+sizestr, "matrix-vector-mul-SSE-f48-unrolled",    "matrix-vector-mul-SSE-f48-unrolled-pcm",    &matrix_vector_mul_SSE_f48_loop_unrolled);
   // matrix-vector mul SSE v2
   test_mat_vec(dummyDouble,    "DOUBLE(SSE v2) matrix_vector_mul ...", l2path+"/"+sizestr, "matrix-vector-mul-SSE-double-v2", "matrix-vector-mul-SSE-double-v2-pcm", &matrix_vector_mul_SSE_double_v2);
   test_mat_vec(dummyf48,       "f48(SSE v2) matrix_vector_mul ...",    l2path+"/"+sizestr, "matrix-vector-mul-SSE-f48-v2",    "matrix-vector-mul-SSE-f48-v2-pcm",    &matrix_vector_mul_SSE_f48_v2);
-  // matrix-vector mul SSE unrolled
-  test_mat_vec(dummyf48,       "f48(SSE unrolled) matrix_vector_mul ...",    l2path+"/"+sizestr, "matrix-vector-mul-SSE-f48-unrolled",    "matrix-vector-mul-SSE-f48-unrolled-pcm",    &matrix_vector_mul_SSE_f48_loop_unrolled);
 
   //LEVEL 3
   //matrix-matrix mul non-SSE
+  if (SIZE < 1024) {
   test_mat_mat(dummyDouble,    "DOUBLE matrix_matrix_mul ...", l3path+"/"+sizestr, "matrix-matrix-mul-double", "matrix-matrix-mul-double-pcm", &matrix_matrix_mul_double);
   test_mat_mat(dummyf48,       "f48 matrix_matrix_mul ...",    l3path+"/"+sizestr, "matrix-matrix-mul-f48",    "matrix-matrix-mul-f48-pcm",    &matrix_matrix_mul_f48);
+  }
   //matrix-matrix mul non-SSE
   test_mat_mat(dummyDouble,    "DOUBLE(SSE) matrix_matrix_mul ...", l3path+"/"+sizestr, "matrix-matrix-mul-SSE-double", "matrix-matrix-mul-SSE-double-pcm", &matrix_matrix_mul_double_SSE);
   test_mat_mat(dummyf48,       "f48(SSE) matrix_matrix_mul ...",    l3path+"/"+sizestr, "matrix-matrix-mul-SSE-f48",    "matrix-matrix-mul-SSE-f48-pcm",    &matrix_matrix_mul_f48_SSE);
