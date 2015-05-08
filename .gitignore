@@ -5,3 +5,4 @@ Debug/
 *.workspace
 *.batch_build
 masters_dissertation.txt
+dist/*
