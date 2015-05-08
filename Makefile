@@ -1,10 +1,19 @@
 LIBS_PATH=/home/andrew/PhD/code/measurement/src/c/
+PCM_PATH=/home/andrew/Downloads/IntelPerformanceCounterMonitorV2.8
 
-all: dist/main
+all: dist/main-nopcm dist/main-pcm
 
-dist/main: main.cpp
+dist/main-nopcm: src/main-nopcm.cpp
 	@ mkdir -p dist
-	@ g++ --std=c++11 -O3 -msse4.2 -I$(LIBS_PATH) main.cpp -o dist/main
+	@ g++ --std=c++11 -O3 -msse4.2 -I$(LIBS_PATH) src/main-nopcm.cpp -o dist/main-nopcm
+
+dist/main-pcm: src/main-pcm.cpp
+	@ mkdir -p dist
+	@ ln -s -f $(PCM_PATH) pcm
+	@ make -C pcm
+	@ g++ --std=c++11 -O3 -msse4.2 -I$(LIBS_PATH) -I ./pcm/ \
+	-L ./pcm/cpucounters.o -L ./pcm/msr.o -L ./pcm/pci.o -L ./pcm/client_bw.o -lpthread \
+	./pcm/cpucounters.cpp ./pcm/msr.cpp ./pcm/pci.cpp ./pcm/client_bw.cpp src/main-pcm.cpp -o dist/main-pcm
 
 clean:
-	@ rm -rf dist/
+	@ rm -rf dist/ pcm

@@ -6,3 +6,5 @@ Debug/
 *.batch_build
 masters_dissertation.txt
 dist/*
+pcm
+pcm/*
