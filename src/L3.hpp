@@ -21,14 +21,14 @@
       /** MATRIX MATRIX MUL double **/
 double** matrix_matrix_mul_double(double** a, double** b)
 {
-  double** res = new double*[size];
-  for(int i=0; i<size; i++) {
-    res[i] = new double[size];
+  double** res = new double*[SIZE];
+  for(int i=0; i<SIZE; i++) {
+    res[i] = new double[SIZE];
   }
-  for(int i=0; i<size; i++) { // a row count
-    for(int j=0; j<size; j++) { // b column count
+  for(int i=0; i<SIZE; i++) { // a row count
+    for(int j=0; j<SIZE; j++) { // b column count
       double sum = 0; // init sum
-      for(int k=0; k<size; k++) { // k offset
+      for(int k=0; k<SIZE; k++) { // k offset
         sum += a[i][k]*b[k][j];
       }
       res[i][j] = sum;
@@ -39,14 +39,14 @@ double** matrix_matrix_mul_double(double** a, double** b)
 
       /** MATRIX MATRIX MUL f48 **/
 f48** matrix_matrix_mul_f48(f48** a, f48** b) {
-  f48** res = new f48*[size];
-  for(int i=0; i<size; i++) {
-    res[i] = new f48[size];
+  f48** res = new f48*[SIZE];
+  for(int i=0; i<SIZE; i++) {
+    res[i] = new f48[SIZE];
   }
-  for(int i=0; i<size; i++) {
-    for(int j=0; j<size; j++) {
+  for(int i=0; i<SIZE; i++) {
+    for(int j=0; j<SIZE; j++) {
       double sum = 0; // compute the sum in doubles
-      for(int k=0; k<size; k++) {
+      for(int k=0; k<SIZE; k++) {
         sum += double(a[i][k])*double(b[k][j]);
       }
       // save back to memory in f48 format
@@ -66,7 +66,7 @@ double** matrix_matrix_mul_double_SSE(double** a, double** b) {
     res[i] = new double[4];
   }
   for(int i=0; i<4; i++){
-    __m128d sum[4]; // size
+    __m128d sum[4]; // SIZE
     for(int x=0;x<4;x++){ // initialisation of final sum
       sum[x] = _mm_setzero_pd();
     }
@@ -119,7 +119,7 @@ f48** matrix_matrix_mul_f48_SSE(f48** a, f48** b){
     res[i] = new f48[4];
   }
   for(int i=0; i<4; i++){
-    __m128d sum[4]; // size
+    __m128d sum[4]; // SIZE
     for(int x=0;x<4;x++){ // initialisation of final sum
       sum[x] = _mm_setzero_pd();
     }

@@ -17,17 +17,17 @@
 #include <config.h>
     /*** LEVEL 2 ***/
 // TODO: implement same using f48 maybe to compare some timmings
-// TODO: function to take size
+// TODO: function to take SIZE
 // function is void as should overwrite the input
 // works for square matrix - ?? does it require to work for not square matrix?
-// ^^ for non-square matrix requires computation of final size of vector
-// matrix * vector always returns vector (size is dependant on the matrix size
+// ^^ for non-square matrix requires computation of final SIZE of vector
+// matrix * vector always returns vector (SIZE is dependant on the matrix SIZE
 void matrix_vector_mul_double(double** mat, double* &vec)
 {
-  double* result = new double[size];
-  for(unsigned i=0;i<size;i++) { // row
+  double* result = new double[SIZE];
+  for(unsigned i=0;i<SIZE;i++) { // row
     double running_sum = 0;
-    for(unsigned j=0;j<size;j++) { // col
+    for(unsigned j=0;j<SIZE;j++) { // col
 	running_sum += mat[i][j]*vec[j];
     }
     result[i] = running_sum;
@@ -37,10 +37,10 @@ void matrix_vector_mul_double(double** mat, double* &vec)
 
 void matrix_vector_mul_f48(f48** mat, f48* &vec)
 {
-  f48* result = new f48[size];
-  for(unsigned i=0;i<size;i++) { // row
+  f48* result = new f48[SIZE];
+  for(unsigned i=0;i<SIZE;i++) { // row
     double running_sum = 0;
-    for(unsigned j=0;j<size;j++) { // col
+    for(unsigned j=0;j<SIZE;j++) { // col
 	running_sum += double(mat[i][j])*double(vec[j]);
     }
     result[i] = (f48)running_sum;
@@ -48,16 +48,16 @@ void matrix_vector_mul_f48(f48** mat, f48* &vec)
   vec = result;
 }
 
-// TODO: function to take size
+// TODO: function to take SIZE
 // TODO: requires implementation
 // matrix is square?
 // same questions as above
 void matrix_vector_mul_SSE_double(double** mat, double* &vec)
 {
-  double* result = new double[size]; // should be size of result!
-  for(unsigned i=0;i<size;i++) { // row
+  double* result = new double[SIZE]; // should be SIZE of result!
+  for(unsigned i=0;i<SIZE;i++) { // row
     __m128d running_sum = _mm_set1_pd(0.0); // running sum initially 0
-    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
+    for(unsigned j=0;j<SIZE;j+=2) { // col - requires skipping on 2 at a time
       // multiply each
       // add to running sum
       __m128d mat_vect = _mm_load_pd(&mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
@@ -84,14 +84,14 @@ void matrix_vector_mul_SSE_double(double** mat, double* &vec)
 // f48 V1
 void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
 {
-  f48* result = new f48[size]; // should be size of result!
+  f48* result = new f48[SIZE]; // should be SIZE of result!
   __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
   __m128i shuffling_mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
 			      15, 14, 13, 12, 11, 10, 9, 8);
-  for(unsigned i=0;i<size;i++) { // row
+  for(unsigned i=0;i<SIZE;i++) { // row
     __m128d running_sum = _mm_set1_pd(0.0); // running sum initially 0
-    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
+    for(unsigned j=0;j<SIZE;j+=2) { // col - requires skipping on 2 at a time
 
       // multiply each
       // add to running sum
@@ -134,11 +134,11 @@ void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
 //
 void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
 {
-  double* result = new double[size];
-  for(unsigned i=0;i<size;i+=2) { // row // requiring 2 at a time
+  double* result = new double[SIZE];
+  for(unsigned i=0;i<SIZE;i+=2) { // row // requiring 2 at a time
     __m128d running_sum1 = _mm_set1_pd(0.0); // running sum initially 0
     __m128d running_sum2 = _mm_set1_pd(0.0); // running sum initially 0
-    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
+    for(unsigned j=0;j<SIZE;j+=2) { // col - requires skipping on 2 at a time
        __m128d mat_vect = _mm_load_pd(&mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
 						  // ^^ needs explanation and backup for REPORT TODO
       __m128d vec_elem = _mm_load_pd(&vec[j]);
@@ -171,13 +171,13 @@ void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
 
 void matrix_vector_mul_SSE_f48_v2(f48** mat, f48* &vec)
 {
-  f48* result = new f48[size];
+  f48* result = new f48[SIZE];
   __m128i load_mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
-  for(unsigned i=0;i<size;i+=2) { // row // requiring 2 at a time
+  for(unsigned i=0;i<SIZE;i+=2) { // row // requiring 2 at a time
     __m128d running_sum1 = _mm_set1_pd(0.0); // running sum initially 0
     __m128d running_sum2 = _mm_set1_pd(0.0); // running sum initially 0
-    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
+    for(unsigned j=0;j<SIZE;j+=2) { // col - requires skipping on 2 at a time
       __m128i mat_vect = _mm_loadu_si128((__m128i*) &mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
 						  // ^^ needs explanation and backup for REPORT - ROW major storing order in C/C++ such as python, pascal and others
       mat_vect = _mm_shuffle_epi8(mat_vect, load_mask);
@@ -211,11 +211,11 @@ void matrix_vector_mul_SSE_f48_v2(f48** mat, f48* &vec)
 
 void matrix_vector_mul_SSE_f48_loop_unrolled (f48** mat, f48* &vec)
 {
-    // TESTING change size to min 8 - but multiple of 8
-    f48* result = new f48[size];
+    // TESTING change SIZE to min 8 - but multiple of 8
+    f48* result = new f48[SIZE];
   __m128i load_mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
-  for(unsigned i=0;i<size;i+=8) { // row // requiring 8 at a time - because loop un-roll
+  for(unsigned i=0;i<SIZE;i+=8) { // row // requiring 8 at a time - because loop un-roll
     __m128d running_sum1 = _mm_set1_pd(0.0); // running sum initially 0
     __m128d running_sum2 = _mm_set1_pd(0.0); // running sum initially 0
     __m128d running_sum3 = _mm_set1_pd(0.0); // running sum initially 0
@@ -225,7 +225,7 @@ void matrix_vector_mul_SSE_f48_loop_unrolled (f48** mat, f48* &vec)
     __m128d running_sum7 = _mm_set1_pd(0.0); // running sum initially 0
     __m128d running_sum8 = _mm_set1_pd(0.0); // running sum initially 0
 
-    for(unsigned j=0;j<size;j+=2) { // col - requires skipping on 2 at a time
+    for(unsigned j=0;j<SIZE;j+=2) { // col - requires skipping on 2 at a time
       __m128i mat_vect = _mm_loadu_si128((__m128i*) &mat[i][j]); // hoping that addresses are as expected - seems like this is the way it's stored
       mat_vect = _mm_shuffle_epi8(mat_vect, load_mask);
       __m128i vec_elem = _mm_loadu_si128((__m128i*) &vec[j]);

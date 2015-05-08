@@ -30,7 +30,7 @@ int main()
 {
   double dummyDouble;
   f48 dummyf48;
-  sprintf(sizestr, "%d", size);
+  sprintf(sizestr, "%d", SIZE);
   string resultspath = "results";
   string l1path = resultspath + "/level1";
   string l2path = resultspath + "/level2";

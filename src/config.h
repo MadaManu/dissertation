@@ -2,7 +2,6 @@
 #define CONFIG_H
 struct stat st = {0};
 
-int size = 256;
 char sizestr[256];
 int runs = 100;
 
@@ -43,7 +42,7 @@ void populate_array(T * a)
   //srand((unsigned)time(0));
   srand(5);
 
-  for ( int i = 0; i < size; i++ ) {
+  for ( int i = 0; i < SIZE; i++ ) {
     a[i] = rand() % 1024;
   }
 }
@@ -53,11 +52,11 @@ void populate_matrix(T ** a)
 {
   //srand((unsigned)time(0));
   srand(5);
-  for(int i = 0; i < size; ++i){
-      a[i] = new T[size];
+  for(int i = 0; i < SIZE; ++i){
+      a[i] = new T[SIZE];
   }
-  for ( int i = 0; i < size; i++ ) {
-    for (int j=0; j<size; j++) {
+  for ( int i = 0; i < SIZE; i++ ) {
+    for (int j=0; j<SIZE; j++) {
 	a[i][j] = rand() % 1024;
     }
   }

@@ -26,7 +26,7 @@ void scale_f48_vector_SSE (f48 * a, f48 scalar)
               5, 4, 3, 2, 1, 0, 255, 255);
 
 
-  for ( int i = 0; i < size; i+=8 ) { // should be size
+  for ( int i = 0; i < SIZE; i+=8 ) { // should be SIZE
 
     // try loading all in 3 SSE items, then shuffle them into 4 128 items and then do the scale and then the conversion and reshuffling in place and storing!!!
     // this will give another set of results for comparison of the methods with the benchmark being the double version
@@ -87,7 +87,7 @@ void scale_double_vector_SSE (double * a, double scalar)
   __m128d scalar_vec = _mm_load1_pd(&scalar);
   __m128d result_vec = _mm_set1_pd(0.0);
 
-  for (int i=0; i<size; i+=2) { // should be size
+  for (int i=0; i<SIZE; i+=2) { // should be SIZE
     __m128d a_vec = _mm_load_pd(&a[i]);
     result_vec = _mm_mul_pd(a_vec, scalar_vec);
     _mm_store_pd(&a[i], result_vec);
@@ -99,7 +99,7 @@ double dot_product_SSE_double (double *a, double *b) {
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
 	__m128d temp_vect;
 
-	for ( int i = 0; i < size; i+= 2 ) {
+	for ( int i = 0; i < SIZE; i+= 2 ) {
 		// load vectors
 		__m128d a_vec = _mm_load_pd(&a[i]);
 		__m128d b_vec = _mm_load_pd(&b[i]);
@@ -124,7 +124,7 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 	__m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 					5, 4, 3, 2, 1, 0, 255, 255);
 
-	for ( int i = 0; i < size; i+= 2 ) {
+	for ( int i = 0; i < SIZE; i+= 2 ) {
 		__m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
 		a_vec = _mm_shuffle_epi8(a_vec, mask);
 		__m128i b_vec = _mm_loadu_si128((__m128i*)(&b[i]));
@@ -150,7 +150,7 @@ f48 absolute_max_SSE_f48 (f48 *a){
   // load the first two as being the max
   __m128i max = _mm_loadu_si128((__m128i*)(&a[0]));
   max = _mm_shuffle_epi8(max, mask);
-  for ( int i = 2; i < size; i+= 2 ) { // start loop from the third element two by two until the end
+  for ( int i = 2; i < SIZE; i+= 2 ) { // start loop from the third element two by two until the end
     __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
     a_vec = _mm_shuffle_epi8(a_vec, mask);
     max = (__m128i)_mm_max_pd((__m128d)max, (__m128d)a_vec);
@@ -174,7 +174,7 @@ f48 absolute_min_SSE_f48 (f48 *a) {
   // load the first two as being the min
   __m128i min = _mm_loadu_si128((__m128i*)(&a[0]));
   min = _mm_shuffle_epi8(min, mask);
-  for ( int i = 2; i < size; i+= 2 ) { // start loop from the third element two by two until the end
+  for ( int i = 2; i < SIZE; i+= 2 ) { // start loop from the third element two by two until the end
     __m128i a_vec = _mm_loadu_si128((__m128i*)(&a[i]));
     a_vec = _mm_shuffle_epi8(a_vec, mask);
     min = (__m128i)_mm_min_pd((__m128d)min, (__m128d)a_vec);
@@ -194,7 +194,7 @@ f48 absolute_min_SSE_f48 (f48 *a) {
 
 double absolute_max_SSE_double (double *a){
   __m128d max = _mm_load_pd(&a[0]);
-  for ( int i = 2; i < size; i+= 2 ) {
+  for ( int i = 2; i < SIZE; i+= 2 ) {
     __m128d a_vec = _mm_load_pd(&a[i]);
     max = _mm_max_pd(max, a_vec);
   }
@@ -210,7 +210,7 @@ double absolute_max_SSE_double (double *a){
 
 double absolute_min_SSE_double (double *a){
   __m128d min = _mm_load_pd(&a[0]);
-  for ( int i = 2; i < size; i+= 2 ) {
+  for ( int i = 2; i < SIZE; i+= 2 ) {
     __m128d a_vec = _mm_load_pd(&a[i]);
     min = _mm_min_pd(min, a_vec);
   }
@@ -228,7 +228,7 @@ f48 magnitude_SSE_f48 (f48 *a){
   __m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
   __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 			       5,  4, 3, 2, 1, 0, 255, 255);
-  for(int i=0; i<size; i+=2){
+  for(int i=0; i<SIZE; i+=2){
    __m128i a_vect = _mm_loadu_si128((__m128i*)(&a[i]));
    a_vect = _mm_shuffle_epi8(a_vect, mask);
    a_vect = (__m128i)_mm_mul_pd((__m128d)a_vect,(__m128d)a_vect); // ^2
@@ -247,7 +247,7 @@ f48 magnitude_SSE_f48 (f48 *a){
 
 double magnitude_SSE_double (double *a){
   __m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
-  for ( int i = 0; i < size; i+= 2 ) {
+  for ( int i = 0; i < SIZE; i+= 2 ) {
     __m128d a_vect = _mm_load_pd(&a[i]);
     a_vect = _mm_mul_pd(a_vect, a_vect); // ^2
     result_vec = _mm_add_pd(result_vec, a_vect); // running sum

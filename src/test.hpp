@@ -9,8 +9,8 @@ void test_2ptr(T, string message, string resultsdir, string filename, string pcm
 {
   cout << message << endl;
   // declaration
-  T * a = new T[size];
-  T * b = new T[size];
+  T * a = new T[SIZE];
+  T * b = new T[SIZE];
 
   // initialisation
   populate_array(a);
@@ -54,10 +54,10 @@ void test_2ptr(T, string message, string resultsdir, string filename, string pcm
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
-  sprintf(timespath, "%s/%s_cycles.txt", resultsdir.c_str(), filename.c_str());
-  sprintf(ipcpath,   "%s/%s_ipc.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l2hitpath, "%s/%s_l2h.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l3hitpath, "%s/%s_l3h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(timespath, "%s/%s-cycles.txt", resultsdir.c_str(), filename.c_str());
+  sprintf(ipcpath,   "%s/%s-ipc.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l2hitpath, "%s/%s-l2h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l3hitpath, "%s/%s-l3h.txt", resultsdir.c_str(), pcmfile.c_str());
 
   timestream.open(timespath);
   ipcstream.open(ipcpath);
@@ -83,7 +83,7 @@ void test_ptr_scalar(T, string message, string resultsdir, string filename, stri
 {
   cout << message << endl;
   // declaration
-  T * a = new T[size];
+  T * a = new T[SIZE];
   T b;
 
   // initialisation
@@ -129,10 +129,10 @@ void test_ptr_scalar(T, string message, string resultsdir, string filename, stri
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
-  sprintf(timespath, "%s/%s_cycles.txt", resultsdir.c_str(), filename.c_str());
-  sprintf(ipcpath,   "%s/%s_ipc.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l2hitpath, "%s/%s_l2h.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l3hitpath, "%s/%s_l3h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(timespath, "%s/%s-cycles.txt", resultsdir.c_str(), filename.c_str());
+  sprintf(ipcpath,   "%s/%s-ipc.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l2hitpath, "%s/%s-l2h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l3hitpath, "%s/%s-l3h.txt", resultsdir.c_str(), pcmfile.c_str());
 
   timestream.open(timespath);
   ipcstream.open(ipcpath);
@@ -157,7 +157,7 @@ void test_ptr(T, string message, string resultsdir, string filename, string pcmf
 {
   cout << message << endl;
   // declaration
-  T * a = new T[size];
+  T * a = new T[SIZE];
   T b;
 
   // initialisation
@@ -200,10 +200,10 @@ void test_ptr(T, string message, string resultsdir, string filename, string pcmf
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
-  sprintf(timespath, "%s/%s_cycles.txt", resultsdir.c_str(), filename.c_str());
-  sprintf(ipcpath,   "%s/%s_ipc.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l2hitpath, "%s/%s_l2h.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l3hitpath, "%s/%s_l3h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(timespath, "%s/%s-cycles.txt", resultsdir.c_str(), filename.c_str());
+  sprintf(ipcpath,   "%s/%s-ipc.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l2hitpath, "%s/%s-l2h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l3hitpath, "%s/%s-l3h.txt", resultsdir.c_str(), pcmfile.c_str());
 
   timestream.open(timespath);
   ipcstream.open(ipcpath);
@@ -228,8 +228,8 @@ void test_mat_vec(T, string message, string resultsdir, string filename, string 
 {
   cout << message << endl;
   // declaration
-  T ** a = new T* [size];
-  T * b = new T [size];
+  T ** a = new T* [SIZE];
+  T * b = new T [SIZE];
 
   // initialisation
   populate_matrix(a);
@@ -273,10 +273,10 @@ void test_mat_vec(T, string message, string resultsdir, string filename, string 
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
-  sprintf(timespath, "%s/%s_cycles.txt", resultsdir.c_str(), filename.c_str());
-  sprintf(ipcpath,   "%s/%s_ipc.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l2hitpath, "%s/%s_l2h.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l3hitpath, "%s/%s_l3h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(timespath, "%s/%s-cycles.txt", resultsdir.c_str(), filename.c_str());
+  sprintf(ipcpath,   "%s/%s-ipc.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l2hitpath, "%s/%s-l2h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l3hitpath, "%s/%s-l3h.txt", resultsdir.c_str(), pcmfile.c_str());
 
   timestream.open(timespath);
   ipcstream.open(ipcpath);
@@ -301,8 +301,8 @@ void test_mat_mat(T, string message, string resultsdir, string filename, string 
 {
   cout << message << endl;
   // declaration
-  T ** a = new T* [size];
-  T ** b = new T* [size];
+  T ** a = new T* [SIZE];
+  T ** b = new T* [SIZE];
 
   // initialisation
   populate_matrix(a);
@@ -346,10 +346,10 @@ void test_mat_mat(T, string message, string resultsdir, string filename, string 
 
   char timespath[256], ipcpath[256], l2hitpath[256], l3hitpath[256];
   ofstream timestream, ipcstream, l2hitstream, l3hitstream;
-  sprintf(timespath, "%s/%s_cycles.txt", resultsdir.c_str(), filename.c_str());
-  sprintf(ipcpath,   "%s/%s_ipc.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l2hitpath, "%s/%s_l2h.txt", resultsdir.c_str(), pcmfile.c_str());
-  sprintf(l3hitpath, "%s/%s_l3h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(timespath, "%s/%s-cycles.txt", resultsdir.c_str(), filename.c_str());
+  sprintf(ipcpath,   "%s/%s-ipc.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l2hitpath, "%s/%s-l2h.txt", resultsdir.c_str(), pcmfile.c_str());
+  sprintf(l3hitpath, "%s/%s-l3h.txt", resultsdir.c_str(), pcmfile.c_str());
 
   timestream.open(timespath);
   ipcstream.open(ipcpath);
