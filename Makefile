@@ -1,9 +1,9 @@
-LIBS_PATH=/home/andrew/PhD/code/measurement/src/c/
+LIBS_PATH=/home/madamanu/measurement/src/c/
 PCM_PATH=/home/andrew/Downloads/IntelPerformanceCounterMonitorV2.8
 CORE=0
-STATS_EXE=/home/andrew/PhD/code/measurement/dist/statistics
-HIST_EXE=/home/andrew/PhD/code/measurement/dist/histogram
-KDE_SH=/home/andrew/PhD/code/measurement/src/sh/kde.sh
+STATS_EXE=/home/madamanu/measurement/dist/statistics
+HIST_EXE=/home/madamanu/measurement/dist/histogram
+KDE_SH=/home/madamanu/measurement/src/sh/kde.sh
 
 all: dist/main-nopcm dist/main-pcm
 
@@ -31,11 +31,17 @@ run-pcm: dist/main-pcm
 	sudo numactl --physcpubind=$(CORE) nice -20 ./dist/main-pcm
 	sudo chown -R $(USER):users results
 
-draw-pcm-1: results/level1/$(SIZE)
-	cd results/level1/$(SIZE)/ ; \
-	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 20 0 1100 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 20 0 1100 > $$x.dat; done ; \
-	OUTPUT=level1.pdf $(KDE_SH) *.dat
+# draw-pcm-1: results/level1/$(SIZE)
+# 	cd results/level1/$(SIZE)/ ; \
+# 	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 20 0 1100 > $$x.stats; done ; \
+# 	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 20 0 1100 > $$x.dat; done ; \
+# 	OUTPUT=level1.pdf $(KDE_SH) *.dat
+
+draw-dot-prod: results/level3/$(SIZE)
+	cd results/level3/$(SIZE)/ ; \
+	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 100 0 8888519900000 > $$x.stats; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 100 0 8888519900000 > $$x.dat; done ; \
+	OUTPUT=mat-mat-sse-$(SIZE).pdf $(KDE_SH) matrix-matrix-mul-SSE-double-cycles.txt.dat matrix-matrix-mul-SSE-f48-cycles.txt.dat
 
 draw-pcm-2: results/level2/$(SIZE)
 	cd results/level2/$(SIZE)/ ; \
