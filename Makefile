@@ -41,13 +41,19 @@ draw-ipc-1: results/level1/$(SIZE)
 	cd results/level1/$(SIZE)/ ; \
 	for x in `ls *ipc.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
 	for x in `ls *ipc.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
-	XLABEL="Instructions per clock" OUTPUT=level1-ipc.pdf $(KDE_SH) *ipc.txt.dat
+	LINESTYLE=points XLABEL="Instructions per clock" OUTPUT=level1-ipc.pdf $(KDE_SH) *ipc.txt.dat
 
 draw-l2h-1: results/level1/$(SIZE)
 	cd results/level1/$(SIZE)/ ; \
-	for x in `ls *ipc.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
+	for x in `ls *l2h.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
 	for x in `ls *l2h.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
-	XLABEL="L2 Hit Rate" OUTPUT=level1-l2h.pdf $(KDE_SH) *l2h.txt.dat
+	LINESTYLE=points XLABEL="L2 Hit Rate" OUTPUT=level1-l2h.pdf $(KDE_SH) *l2h.txt.dat
+
+draw-l3h-1: results/level1/$(SIZE)
+	cd results/level1/$(SIZE)/ ; \
+	for x in `ls *l3h.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
+	for x in `ls *l3h.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
+	LINESTYLE=points XLABEL="L3 Hit Rate" OUTPUT=level1-l3h.pdf $(KDE_SH) *l3h.txt.dat
 
 draw-pcm-2: results/level2/$(SIZE)
 	cd results/level2/$(SIZE)/ ; \
