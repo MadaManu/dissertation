@@ -47,19 +47,37 @@ draw-l2h-1: results/level1/$(SIZE)
 	cd results/level1/$(SIZE)/ ; \
 	for x in `ls *l2h.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
 	for x in `ls *l2h.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
-	LINESTYLE=points XLABEL="L2 Hit Rate" OUTPUT=level1-l2h.pdf $(KDE_SH) *l2h.txt.dat
+	XLABEL="L2 Hit Rate" OUTPUT=level1-l2h.pdf $(KDE_SH) *l2h.txt.dat
 
 draw-l3h-1: results/level1/$(SIZE)
 	cd results/level1/$(SIZE)/ ; \
 	for x in `ls *l3h.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
 	for x in `ls *l3h.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
-	LINESTYLE=points XLABEL="L3 Hit Rate" OUTPUT=level1-l3h.pdf $(KDE_SH) *l3h.txt.dat
+	XLABEL="L3 Hit Rate" OUTPUT=level1-l3h.pdf $(KDE_SH) *l3h.txt.dat
 
 draw-pcm-2: results/level2/$(SIZE)
 	cd results/level2/$(SIZE)/ ; \
-	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 6000 0 1000000 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 6000 0 1000000 > $$x.dat; done ; \
-	OUTPUT=level2.pdf $(KDE_SH) *cycles.txt.dat
+	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 1000 0 1000000 > $$x.stats; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 1000 0 1000000 > $$x.dat; done ; \
+	OUTPUT=level2.pdf $(KDE_SH) *double*cycles.txt.dat
+
+draw-ipc-2: results/level2/$(SIZE)
+	cd results/level2/$(SIZE)/ ; \
+	for x in `ls *ipc.txt`; do $(STATS_EXE)-float $$x 100 0.2 0 10 > $$x.stats; done ; \
+	for x in `ls *ipc.txt`; do $(HIST_EXE)-float $$x 100 0.2 0 10 > $$x.dat; done ; \
+	XLABEL="Instructions per clock" OUTPUT=level2-ipc.pdf $(KDE_SH) *double*ipc.txt.dat
+
+draw-l2h-2: results/level2/$(SIZE)
+	cd results/level2/$(SIZE)/ ; \
+	for x in `ls *l2h.txt`; do $(STATS_EXE)-float $$x 100 0.2 0 10 > $$x.stats; done ; \
+	for x in `ls *l2h.txt`; do $(HIST_EXE)-float $$x 100 0.2 0 10 > $$x.dat; done ; \
+	XLABEL="L2 Hit Rate" OUTPUT=level2-l2h.pdf $(KDE_SH) *double*l2h.txt.dat
+
+draw-l3h-2: results/level2/$(SIZE)
+	cd results/level2/$(SIZE)/ ; \
+	for x in `ls *l3h.txt`; do $(STATS_EXE)-float $$x 100 0.2 0 10 > $$x.stats; done ; \
+	for x in `ls *l3h.txt`; do $(HIST_EXE)-float $$x 100 0.2 0 10 > $$x.dat; done ; \
+	XLABEL="L3 Hit Rate" OUTPUT=level2-l3h.pdf $(KDE_SH) *double*l3h.txt.dat
 
 draw-pcm-3: results/level3/$(SIZE)
 	cd results/level3/$(SIZE)/ ; \
