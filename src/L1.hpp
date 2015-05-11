@@ -17,7 +17,7 @@
 #include <config.h>
     /*** LEVEL 1 ***/
 
-void scale_f48_vector_SSE (f48 * a, f48 scalar)
+void scale_f48_vector_SSE (fl48 * a, fl48 scalar)
 {
    double double_scalar = (double)scalar;
   __m128d scalar_vec = _mm_load1_pd(&double_scalar);
@@ -118,7 +118,7 @@ double dot_product_SSE_double (double *a, double *b) {
 	return total;
 }
 
-f48 dot_product_SSE_f48 (f48 *a, f48 *b){
+fl48 dot_product_SSE_f48 (fl48 *a, fl48 *b){
 	double total=0;
 	__m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
 	__m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
@@ -140,11 +140,11 @@ f48 dot_product_SSE_f48 (f48 *a, f48 *b){
 
 // 	_mm_store1_pd(&total, result_vec);
 	_mm_store_sd(&total, result_vec);
-	f48 total_result (total);
+	fl48 total_result (total);
 	return total_result;
 }
 
-f48 absolute_max_SSE_f48 (f48 *a){
+fl48 absolute_max_SSE_f48 (fl48 *a){
   __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 			       5,  4, 3, 2, 1, 0, 255, 255);
   // load the first two as being the max
@@ -155,7 +155,7 @@ f48 absolute_max_SSE_f48 (f48 *a){
     a_vec = _mm_shuffle_epi8(a_vec, mask);
     max = (__m128i)_mm_max_pd((__m128d)max, (__m128d)a_vec);
   }
-  // at the end compare max with suffle max and find the maximum value that needs to be stored in a double that requires conversion back to f48
+  // at the end compare max with suffle max and find the maximum value that needs to be stored in a double that requires conversion back to fl48
   mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
 		      15, 14, 13, 12, 11, 10, 9, 8);
   __m128i max_shuffled = _mm_shuffle_epi8(max, mask);
@@ -164,11 +164,11 @@ f48 absolute_max_SSE_f48 (f48 *a){
   double maximum=0;
 //   _mm_store1_pd(&maximum, max_result);
   _mm_store_sd(&maximum, max_result);
-  f48 max_f48 (maximum);
+  fl48 max_f48 (maximum);
   return max_f48;
 }
 
-f48 absolute_min_SSE_f48 (f48 *a) {
+fl48 absolute_min_SSE_f48 (fl48 *a) {
     __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 			       5,  4, 3, 2, 1, 0, 255, 255);
   // load the first two as being the min
@@ -179,7 +179,7 @@ f48 absolute_min_SSE_f48 (f48 *a) {
     a_vec = _mm_shuffle_epi8(a_vec, mask);
     min = (__m128i)_mm_min_pd((__m128d)min, (__m128d)a_vec);
   }
-  // at the end compare min with suffle min and find the maximum value that needs to be stored in a double that requires conversion back to f48
+  // at the end compare min with suffle min and find the maximum value that needs to be stored in a double that requires conversion back to fl48
   mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
 		      15, 14, 13, 12, 11, 10, 9, 8);
   __m128i min_shuffled = _mm_shuffle_epi8(min, mask);
@@ -188,7 +188,7 @@ f48 absolute_min_SSE_f48 (f48 *a) {
   double minimum=0;
 //   _mm_store1_pd(&minimum, min_result);
   _mm_store_sd(&minimum, min_result);
-  f48 max_f48 (minimum);
+  fl48 max_f48 (minimum);
   return max_f48;
 }
 
@@ -224,7 +224,7 @@ double absolute_min_SSE_double (double *a){
   return minimum;
 }
 
-f48 magnitude_SSE_f48 (f48 *a){
+fl48 magnitude_SSE_f48 (fl48 *a){
   __m128d result_vec = _mm_set1_pd(0.0); // result initially 0 - running sum
   __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
 			       5,  4, 3, 2, 1, 0, 255, 255);
@@ -242,7 +242,7 @@ f48 magnitude_SSE_f48 (f48 *a){
   double res=0;
 //   _mm_store1_pd(&res, result_vec);
   _mm_store_sd(&res, result_vec);
-  return f48(res);
+  return fl48(res);
 }
 
 double magnitude_SSE_double (double *a){

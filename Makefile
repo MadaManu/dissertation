@@ -20,6 +20,15 @@ dist/main-pcm: src/main-pcm.cpp src/test.hpp
 	-L ./pcm/cpucounters.o -L ./pcm/msr.o -L ./pcm/pci.o -L ./pcm/client_bw.o -lpthread \
 	./pcm/cpucounters.cpp ./pcm/msr.cpp ./pcm/pci.cpp ./pcm/client_bw.cpp src/main-pcm.cpp -o dist/main-pcm
 
+dist/main-pcm-branchless: src/main-pcm.cpp src/test.hpp
+	@ mkdir -p dist
+	@ ln -s -f $(PCM_PATH) pcm
+	@ make -C pcm
+	@ g++ --std=c++11 -O3 -msse4.2 -DSIZE=$(SIZE) -DUSE_GENERATED \
+	-I$(LIBS_PATH) -I ./pcm/  -I ./src \
+	-L ./pcm/cpucounters.o -L ./pcm/msr.o -L ./pcm/pci.o -L ./pcm/client_bw.o -lpthread \
+	./pcm/cpucounters.cpp ./pcm/msr.cpp ./pcm/pci.cpp ./pcm/client_bw.cpp src/main-pcm.cpp -o dist/main-pcm
+
 clean:
 	@ rm -rf dist/ pcm
 
@@ -33,8 +42,8 @@ run-pcm: dist/main-pcm
 
 draw-pcm-1: results/level1/$(SIZE)
 	cd results/level1/$(SIZE)/ ; \
-	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 20 0 1100 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 20 0 1100 > $$x.dat; done ; \
+	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 35 0 1100 > $$x.stats; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 35 0 1100 1 > $$x.dat; done ; \
 	OUTPUT=level1-cycles.pdf $(KDE_SH) *cycles.txt.dat
 
 draw-ipc-1: results/level1/$(SIZE)
@@ -58,7 +67,7 @@ draw-l3h-1: results/level1/$(SIZE)
 draw-pcm-2: results/level2/$(SIZE)
 	cd results/level2/$(SIZE)/ ; \
 	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 1000 0 1000000 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 1000 0 1000000 > $$x.dat; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 1000 0 1000000 1 > $$x.dat; done ; \
 	OUTPUT=level2.pdf $(KDE_SH) *double*cycles.txt.dat
 
 draw-ipc-2: results/level2/$(SIZE)
@@ -82,11 +91,11 @@ draw-l3h-2: results/level2/$(SIZE)
 draw-pcm-3: results/level3/$(SIZE)
 	cd results/level3/$(SIZE)/ ; \
 	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 300000 0 1000000000 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 300000 0 1000000000 > $$x.dat; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 300000 0 1000000000 1 > $$x.dat; done ; \
 	OUTPUT=level3.pdf $(KDE_SH) *cycles.txt.dat
 
 draw-pcm-3-sse: results/level3/$(SIZE)
 	cd results/level3/$(SIZE)/ ; \
 	for x in `ls *SSE*cycles.txt`; do $(STATS_EXE) $$x 100 100 0 3000 > $$x.stats; done ; \
-	for x in `ls *SSE*cycles.txt`; do $(HIST_EXE) $$x 100 100 0 3000 > $$x.dat; done ; \
+	for x in `ls *SSE*cycles.txt`; do $(HIST_EXE) $$x 100 100 0 3000 1 > $$x.dat; done ; \
 	OUTPUT=level3-SSE.pdf $(KDE_SH) *SSE*cycles.txt.dat

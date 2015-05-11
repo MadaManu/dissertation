@@ -37,11 +37,11 @@ double** matrix_matrix_mul_double(double** a, double** b)
   return res;
 }
 
-      /** MATRIX MATRIX MUL f48 **/
-f48** matrix_matrix_mul_f48(f48** a, f48** b) {
-  f48** res = new f48*[SIZE];
+      /** MATRIX MATRIX MUL fl48 **/
+fl48** matrix_matrix_mul_f48(fl48** a, fl48** b) {
+  fl48** res = new fl48*[SIZE];
   for(int i=0; i<SIZE; i++) {
-    res[i] = new f48[SIZE];
+    res[i] = new fl48[SIZE];
   }
   for(int i=0; i<SIZE; i++) {
     for(int j=0; j<SIZE; j++) {
@@ -49,8 +49,8 @@ f48** matrix_matrix_mul_f48(f48** a, f48** b) {
       for(int k=0; k<SIZE; k++) {
         sum += double(a[i][k])*double(b[k][j]);
       }
-      // save back to memory in f48 format
-      res[i][j] = f48(sum);
+      // save back to memory in fl48 format
+      res[i][j] = fl48(sum);
     }
   }
   return res;
@@ -113,10 +113,10 @@ double** matrix_matrix_mul_double_SSE(double** a, double** b) {
   return res;
 }
 
-f48** matrix_matrix_mul_f48_SSE(f48** a, f48** b){
-  f48** res = new f48*[4];
+fl48** matrix_matrix_mul_f48_SSE(fl48** a, fl48** b){
+  fl48** res = new fl48*[4];
   for(int i=0; i<4; i++) {
-    res[i] = new f48[4];
+    res[i] = new fl48[4];
   }
   for(int i=0; i<4; i++){
     __m128d sum[4]; // SIZE
@@ -165,7 +165,7 @@ f48** matrix_matrix_mul_f48_SSE(f48** a, f48** b){
       sum[x] = _mm_add_pd(sum[x],sum_shuffled);
       double temp;
       _mm_store_sd(&temp, sum[x]);
-      res[i][x] = f48(temp);
+      res[i][x] = fl48(temp);
       sum[x] = _mm_setzero_pd(); // reset running sums
     }
 

@@ -28,8 +28,9 @@ using namespace std;
 
 int main()
 {
+  srand(time(0));
   double dummyDouble;
-  f48 dummyf48;
+  fl48 dummyf48;
   sprintf(sizestr, "%d", SIZE);
   string resultspath = "results";
   string l1path = resultspath + "/level1";

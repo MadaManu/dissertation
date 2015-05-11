@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <config.h>
     /*** LEVEL 2 ***/
-// TODO: implement same using f48 maybe to compare some timmings
+// TODO: implement same using fl48 maybe to compare some timmings
 // TODO: function to take SIZE
 // function is void as should overwrite the input
 // works for square matrix - ?? does it require to work for not square matrix?
@@ -35,15 +35,15 @@ void matrix_vector_mul_double(double** mat, double* &vec)
   vec = result;
 }
 
-void matrix_vector_mul_f48(f48** mat, f48* &vec)
+void matrix_vector_mul_f48(fl48** mat, fl48* &vec)
 {
-  f48* result = new f48[SIZE];
+  fl48* result = new fl48[SIZE];
   for(unsigned i=0;i<SIZE;i++) { // row
     double running_sum = 0;
     for(unsigned j=0;j<SIZE;j++) { // col
 	running_sum += double(mat[i][j])*double(vec[j]);
     }
-    result[i] = (f48)running_sum;
+    result[i] = (fl48)running_sum;
   }
   vec = result;
 }
@@ -81,10 +81,10 @@ void matrix_vector_mul_SSE_double(double** mat, double* &vec)
   vec = result;
 }
 
-// f48 V1
-void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
+// fl48 V1
+void matrix_vector_mul_SSE_f48(fl48** mat, fl48* &vec)
 {
-  f48* result = new f48[SIZE]; // should be SIZE of result!
+  fl48* result = new fl48[SIZE]; // should be SIZE of result!
   __m128i mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
   __m128i shuffling_mask = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
@@ -112,7 +112,7 @@ void matrix_vector_mul_SSE_f48(f48** mat, f48* &vec)
     running_sum = _mm_add_pd(running_sum,(__m128d)sum_shuffled);
     double temp=0;
     _mm_store_sd(&temp, running_sum);
-    result[i]=f48(temp);
+    result[i]=fl48(temp);
   }
   vec = result;
 }
@@ -169,9 +169,9 @@ void matrix_vector_mul_SSE_double_v2(double** mat, double* &vec)
   vec = result;
 }
 
-void matrix_vector_mul_SSE_f48_v2(f48** mat, f48* &vec)
+void matrix_vector_mul_SSE_f48_v2(fl48** mat, fl48* &vec)
 {
-  f48* result = new f48[SIZE];
+  fl48* result = new fl48[SIZE];
   __m128i load_mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
   for(unsigned i=0;i<SIZE;i+=2) { // row // requiring 2 at a time
@@ -202,17 +202,17 @@ void matrix_vector_mul_SSE_f48_v2(f48** mat, f48* &vec)
     running_sum2 = _mm_add_pd(running_sum2,(__m128d)sum_shuffled);
     double temp = 0;
     _mm_store_sd((double*)&temp, running_sum2);
-    result[i] = f48(temp);
+    result[i] = fl48(temp);
     _mm_store_sd((double*)&temp, running_sum2);
-    result[i+1] = f48(temp);
+    result[i+1] = fl48(temp);
   }
   vec = result;
 }
 
-void matrix_vector_mul_SSE_f48_loop_unrolled (f48** mat, f48* &vec)
+void matrix_vector_mul_SSE_f48_loop_unrolled (fl48** mat, fl48* &vec)
 {
     // TESTING change SIZE to min 8 - but multiple of 8
-    f48* result = new f48[SIZE];
+    fl48* result = new fl48[SIZE];
   __m128i load_mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
   			      5, 4, 3, 2, 1, 0, 255, 255);
   for(unsigned i=0;i<SIZE;i+=8) { // row // requiring 8 at a time - because loop un-roll

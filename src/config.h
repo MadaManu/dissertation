@@ -1,5 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
+#include <conversion.h>
 struct stat st = {0};
 
 char sizestr[256];
@@ -26,44 +27,29 @@ public:
 } __attribute__((packed));
 
 /************* class f48 ************************************/
-class f48 {
+class fl48 {
 private:
   unsigned long long num:48;
+
 public:
-  f48() { };
-  f48(double value);
+  fl48() { };
+  fl48(double value);
   operator double();
 } __attribute__((packed));
 
+#ifdef USE_GENERATED
+fl48::fl48(double value) { round_double_t_f48(&value, (struct f48 *) this); }
 
-template <class T>
-void populate_array(T * a)
+fl48::operator double()
 {
-  //srand((unsigned)time(0));
-  srand(5);
-
-  for ( int i = 0; i < SIZE; i++ ) {
-    a[i] = rand() % 1024;
-  }
+  double result;
+  round_f48_double_t((struct f48 *) this, &result);
+  return result;
 }
 
-template <class T>
-void populate_matrix(T ** a)
-{
-  //srand((unsigned)time(0));
-  srand(5);
-  for(int i = 0; i < SIZE; ++i){
-      a[i] = new T[SIZE];
-  }
-  for ( int i = 0; i < SIZE; i++ ) {
-    for (int j=0; j<SIZE; j++) {
-	a[i][j] = rand() % 1024;
-    }
-  }
-}
+#else
 
-/*************** F48 ***************/
-f48::f48(double value)
+fl48::fl48(double value)
 {
   // TODO: optimize this code!
   // convert to 64-bit pattern
@@ -93,62 +79,90 @@ f48::f48(double value)
  */
 
   if(G){
-	  if (R||S){ // R or S is true go up
-		  mantissa = mantissa +1;
-		  if((mantissa>>36)&1){ // overflow of mantissa
-			  mantissa = 0; // reset mantissa
-			  // add one to exponent
-			  // extract exponent only add one to it and check for overflow
-			  unsigned long long exponent_mask = (unsigned long long)(1)<<63;
-			  exponent_mask = ~exponent_mask;
-			  unsigned long long exponent = (signExponent & exponent_mask);
-			  exponent += 1;
-			  exponent = exponent >> 12;
-			  if (exponent>0) { // overflow on exponent set to +/- infinity
-				  signExponent = signExponent | ((unsigned long long)2047<<52); // set all the bits of the exponent to 1 keeping sign
-				  mantissa = mantissa & 0; // make sure mantissa is 0
-			  }
-		  }
-	  } else { // TIE situation
-	  // add 1 if the mantissa is odd
-	  // add 1 if the mantissa is even
-		  // check bit before G
-		  if((mantissa>>1)&1) {
-			  mantissa = mantissa +1;
-			  if((mantissa>>36)&1){ // overflow of mantissa
-				  mantissa = 0; // reset mantissa
-				  // add one to exponent
-				  // extract exponent only add one to it and check for overflow
-				   unsigned long long exponent_mask = (unsigned long long)(1)<<63;
-				  exponent_mask = ~exponent_mask;
-				  unsigned long long exponent = (signExponent & exponent_mask);
-				  exponent += 1;
-				  exponent = exponent >> 12;
-				  if (exponent>0) { // overflow on exponent set to +/- infinity
-					  signExponent = signExponent | ((unsigned long long)2047<<52); // set all the bits of the exponent to 1 keeping sign
-					  mantissa = mantissa & 0; // make sure mantissa is 0
-				  }
-			  }
-		  } // else do nothing
-	  }
+         if (R||S){ // R or S is true go up
+                 mantissa = mantissa +1;
+                 if((mantissa>>36)&1){ // overflow of mantissa
+                         mantissa = 0; // reset mantissa
+                         // add one to exponent
+                         // extract exponent only add one to it and check for overflow
+                         unsigned long long exponent_mask = (unsigned long long)(1)<<63;
+                         exponent_mask = ~exponent_mask;
+                         unsigned long long exponent = (signExponent & exponent_mask);
+                         exponent += 1;
+                         exponent = exponent >> 12;
+                         if (exponent>0) { // overflow on exponent set to +/- infinity
+                                 signExponent = signExponent | ((unsigned long long)2047<<52); // set all the bits of the exponent to 1 keeping sign
+                                 mantissa = mantissa & 0; // make sure mantissa is 0
+                         }
+                 }
+         } else { // TIE situation
+         // add 1 if the mantissa is odd
+         // add 1 if the mantissa is even
+                 // check bit before G
+                 if((mantissa>>1)&1) {
+                         mantissa = mantissa +1;
+                         if((mantissa>>36)&1){ // overflow of mantissa
+                                 mantissa = 0; // reset mantissa
+                                 // add one to exponent
+                                 // extract exponent only add one to it and check for overflow
+                                  unsigned long long exponent_mask = (unsigned long long)(1)<<63;
+                                 exponent_mask = ~exponent_mask;
+                                 unsigned long long exponent = (signExponent & exponent_mask);
+                                 exponent += 1;
+                                 exponent = exponent >> 12;
+                                 if (exponent>0) { // overflow on exponent set to +/- infinity
+                                         signExponent = signExponent | ((unsigned long long)2047<<52); // set all the bits of the exponent to 1 keeping sign
+                                         mantissa = mantissa & 0; // make sure mantissa is 0
+                                 }
+                         }
+                 } // else do nothing
+         }
   } else {
-	  // not required as if G is 0 R&S are x (don't cares)
+         // not required as if G is 0 R&S are x (don't cares)
   }
   unsigned long long result = (mantissa<<16) + signExponent;
 // to convert the number back to double there is a need of having the conversion
 // done in the union (convert)
 convert.l = result;
 // cout<<convert.d;
-	// compensate for little endianess
+       // compensate for little endianess
   this->num = result >> 16;
 
 }
 
-f48::operator double()
+fl48::operator double()
 {
   // convert to double
   convert.l = (this->num)<<16; // pad to compensate for little endianess
   return convert.d;
+}
+
+#endif
+
+template <class T>
+void populate_array(T * a)
+{
+  uint64_t r;
+  for ( int i = 0; i < SIZE; i++ ) {
+    r = ((uint64_t)rand()) << 32 | ((uint64_t)rand());
+    a[i] = (T) r;
+  }
+}
+
+template <class T>
+void populate_matrix(T ** a)
+{
+  for(int i = 0; i < SIZE; ++i){
+      a[i] = new T[SIZE];
+  }
+
+  uint64_t r;
+  for ( int i = 0; i < SIZE; i++ ) {
+    for (int j=0; j<SIZE; j++) {
+      r = ((uint64_t)rand()) << 32 | ((uint64_t)rand());
+      a[i][j] = (T) r;
+    }
+  }
 }
 
 /************** CONVERSION FUNCTION SSE **************/
