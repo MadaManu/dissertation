@@ -61,17 +61,17 @@ f48** matrix_matrix_mul_f48(f48** a, f48** b) {
 
       /** MATRIX MATRIX MUL double SSE **/
 double** matrix_matrix_mul_double_SSE(double** a, double** b) {
-  double** res = new double*[4];
-  for(int i=0; i<4; i++) {
-    res[i] = new double[4];
+  double** res = new double*[SIZE];
+  for(int i=0; i<SIZE; i++) {
+    res[i] = new double[SIZE];
   }
-  for(int i=0; i<4; i++){
-    __m128d sum[4]; // SIZE
-    for(int x=0;x<4;x++){ // initialisation of final sum
+  for(int i=0; i<SIZE; i++){
+    __m128d sum[SIZE]; // SIZE
+    for(int x=0;x<SIZE;x++){ // initialisation of final sum
       sum[x] = _mm_setzero_pd();
     }
-    for(int j=0; j<4; j+=2){
-      for(int offset=0; offset<4; offset+=2){
+    for(int j=0; j<SIZE; j+=2){
+      for(int offset=0; offset<SIZE; offset+=2){
         __m128d elemA = _mm_load_pd(&a[i][j]);
         __m128d elemb1 = _mm_load_pd(&b[j][offset]);
         __m128d elemb2 = _mm_load_pd(&b[j+1][offset]);
@@ -98,7 +98,7 @@ double** matrix_matrix_mul_double_SSE(double** a, double** b) {
         sum[offset+1] = _mm_add_pd(sum[offset+1],bf);
       }
     }
-    for(int x=0;x<4;x++){
+    for(int x=0;x<SIZE;x++){
       // hadd
       __m128i mask_hadd = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
                         15, 14, 13, 12, 11, 10, 9, 8);
@@ -114,17 +114,17 @@ double** matrix_matrix_mul_double_SSE(double** a, double** b) {
 }
 
 f48** matrix_matrix_mul_f48_SSE(f48** a, f48** b){
-  f48** res = new f48*[4];
-  for(int i=0; i<4; i++) {
-    res[i] = new f48[4];
+  f48** res = new f48*[SIZE];
+  for(int i=0; i<SIZE; i++) {
+    res[i] = new f48[SIZE];
   }
-  for(int i=0; i<4; i++){
-    __m128d sum[4]; // SIZE
-    for(int x=0;x<4;x++){ // initialisation of final sum
+  for(int i=0; i<SIZE; i++){
+    __m128d sum[SIZE]; // SIZE
+    for(int x=0;x<SIZE;x++){ // initialisation of final sum
       sum[x] = _mm_setzero_pd();
     }
-    for(int j=0; j<4; j+=2){
-      for(int offset=0; offset<4; offset+=2){
+    for(int j=0; j<SIZE; j+=2){
+      for(int offset=0; offset<SIZE; offset+=2){
         // load mask
         __m128i load_mask = _mm_set_epi8(11, 10, 9, 8, 7, 6, 255, 255,
                        5, 4, 3, 2, 1, 0, 255, 255);
@@ -157,7 +157,7 @@ f48** matrix_matrix_mul_f48_SSE(f48** a, f48** b){
         sum[offset+1] = _mm_add_pd(sum[offset+1],bf);
       }
     }
-    for(int x=0;x<4;x++){
+    for(int x=0;x<SIZE;x++){
       // hadd
       __m128i mask_hadd = _mm_set_epi8(7 ,6 ,5, 4, 3, 2, 1, 0,
                         15, 14, 13, 12, 11, 10, 9, 8);
