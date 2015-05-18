@@ -249,8 +249,8 @@ void test_mat_vec(T, string message, string resultsdir, string filename, string 
     l3HitRate[i-1]      = getL3CacheHitRatio(before_sstate,after_sstate);
 
     // repopulate
-    populate_matrix(a);
-    populate_array(b);
+    //populate_matrix(a);
+    //populate_array(b);
   }
 
   m->cleanup();
@@ -319,8 +319,8 @@ void test_mat_mat(T, string message, string resultsdir, string filename, string 
     l3HitRate[i-1]      = getL3CacheHitRatio(before_sstate,after_sstate);
 
     // repopulate
-    populate_matrix(a);
-    populate_matrix(b);
+    //populate_matrix(a);
+    //populate_matrix(b);
   }
 
   m->cleanup();
@@ -353,3 +353,4 @@ void test_mat_mat(T, string message, string resultsdir, string filename, string 
 
   cout << "Done. Results in " << resultsdir << endl;
 }
+
