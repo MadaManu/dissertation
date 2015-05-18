@@ -1,9 +1,9 @@
-LIBS_PATH=/home/andrew/workspace/measurement/src/c/
-PCM_PATH=/home/andrew/Downloads/IntelPerformanceCounterMonitorV2.8
+LIBS_PATH=/home/andrew/PhD/code/measurement/src/c/
+PCM_PATH=/home/andrew/Tools/IntelPerformanceCounterMonitorV2.8
 CORE=0
-STATS_EXE=/home/andrew/workspace/measurement/dist/statistics
-HIST_EXE=/home/andrew/workspace/measurement/dist/histogram
-KDE_SH=/home/andrew/workspace/measurement/src/sh/kde.sh
+STATS_EXE=/home/andrew/PhD/code/measurement/dist/statistics
+HIST_EXE=/home/andrew/PhD/code/measurement/dist/histogram
+KDE_SH=/home/andrew/PhD/code/measurement/src/sh/kde.sh
 
 all: dist/main-pcm
 

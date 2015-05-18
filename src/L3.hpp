@@ -113,10 +113,10 @@ double** matrix_matrix_mul_double_SSE(double** a, double** b) {
   return res;
 }
 
-f48** matrix_matrix_mul_f48_SSE(f48** a, f48** b){
-  f48** res = new f48*[SIZE];
+fl48** matrix_matrix_mul_f48_SSE(fl48** a, fl48** b){
+  fl48** res = new fl48*[SIZE];
   for(int i=0; i<SIZE; i++) {
-    res[i] = new f48[SIZE];
+    res[i] = new fl48[SIZE];
   }
   for(int i=0; i<SIZE; i++){
     __m128d sum[SIZE]; // SIZE
