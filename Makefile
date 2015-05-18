@@ -40,29 +40,17 @@ run-pcm: dist/main-pcm
 	sudo numactl --physcpubind=$(CORE) nice -20 ./dist/main-pcm
 	sudo chown -R $(USER):users results
 
-draw-pcm-1: results/level1/$(SIZE)
-	cd results/level1/$(SIZE)/ ; \
-	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 35 0 1100 > $$x.stats; done ; \
-	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 35 0 1100 1 > $$x.dat; done ; \
-	OUTPUT=level1-cycles.pdf $(KDE_SH) *cycles.txt.dat
+# draw-pcm-1: results/level1/$(SIZE)
+# 	cd results/level1/$(SIZE)/ ; \
+# 	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 20 0 1100 > $$x.stats; done ; \
+# 	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 20 0 1100 > $$x.dat; done ; \
+# 	OUTPUT=level1.pdf $(KDE_SH) *.dat
 
-draw-ipc-1: results/level1/$(SIZE)
-	cd results/level1/$(SIZE)/ ; \
-	for x in `ls *ipc.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
-	for x in `ls *ipc.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
-	LINESTYLE=points XLABEL="Instructions per clock" OUTPUT=level1-ipc.pdf $(KDE_SH) *ipc.txt.dat
-
-draw-l2h-1: results/level1/$(SIZE)
-	cd results/level1/$(SIZE)/ ; \
-	for x in `ls *l2h.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
-	for x in `ls *l2h.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
-	XLABEL="L2 Hit Rate" OUTPUT=level1-l2h.pdf $(KDE_SH) *l2h.txt.dat
-
-draw-l3h-1: results/level1/$(SIZE)
-	cd results/level1/$(SIZE)/ ; \
-	for x in `ls *l3h.txt`; do $(STATS_EXE)-float $$x 100 0.01 0 10 > $$x.stats; done ; \
-	for x in `ls *l3h.txt`; do $(HIST_EXE)-float $$x 100 0.01 0 10 > $$x.dat; done ; \
-	XLABEL="L3 Hit Rate" OUTPUT=level1-l3h.pdf $(KDE_SH) *l3h.txt.dat
+draw-dot-prod: results/level3/$(SIZE)
+	cd results/level3/$(SIZE)/ ; \
+	for x in `ls *cycles.txt`; do $(STATS_EXE) $$x 100 100 0 8888519900000 > $$x.stats; done ; \
+	for x in `ls *cycles.txt`; do $(HIST_EXE) $$x 100 100 0 8888519900000 > $$x.dat; done ; \
+	OUTPUT=mat-mat-sse-$(SIZE).pdf $(KDE_SH) matrix-matrix-mul-SSE-double-cycles.txt.dat matrix-matrix-mul-SSE-f48-cycles.txt.dat
 
 draw-pcm-2: results/level2/$(SIZE)
 	cd results/level2/$(SIZE)/ ; \
